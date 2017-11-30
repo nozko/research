@@ -143,7 +143,8 @@ if __name__ == '__main__':
 	simulate.result_output(datetime, M, S, ds, Qm, temp_r, W)
 
 
-	roopnum = len(simulate.weathers)
+#	roopnum = len(simulate.weathers)
+	roopnum = 3
 	for n in range(roopnum-1):
 
 		num += 1
@@ -190,14 +191,14 @@ if __name__ == '__main__':
 		# 雪氷量
 		S = simulate.calc_S(S_1, rs, F, M, elapsed_t)
 
-		if(S>0):
+		if(S>0.0):
 			# 積雪の密度
 			ro_s = simulate.calc_ro_s(temp_o, on_t, S_1, F, M, elapsed_t, ro_s_1, ro_f)
 
 		# 水分の路面からの浸透高さ
 		dw = simulate.calc_dw()
 
-		if(S>0):
+		if(S>0.0):
 			# 雪面の路面からの高さ
 			ds = simulate.calc_ds(S, ro_s)
 
@@ -207,7 +208,7 @@ if __name__ == '__main__':
 		# 路面から外界への潜熱伝熱量
 		Qer = simulate.calc_Qer(Er)
 
-		if(S>0):
+		if(S>0.0):
 			# 雪から外界への顕熱伝熱量
 			Qas = simulate.calc_Qas(alpha_c, ds, dw, temp_e)
 
@@ -220,7 +221,7 @@ if __name__ == '__main__':
 		# 融雪熱量
 		Qm = simulate.calc_Qm(M)
 
-		if(S>0):
+		if(S>0.0):
 			# 路面から相変化中の雪への伝熱量
 			Qs = simulate.calc_Qs(Qas, Qes, Qm)
 
