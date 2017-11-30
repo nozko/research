@@ -12,14 +12,10 @@ snow and road-heating simulation
 
 from __future__ import print_function
 import math
-import commands
 from datetime import datetime
 import time
 from string import *
 import argparse
-import random
-import linecache
-import sys
 
 ### constant ###
 pi = 3.14		# 				円周率
@@ -59,7 +55,7 @@ Qp = 300		# [W/m^2]		供給熱量(パイプ)
 #off_t		offになってからの経過時間(min)
 
 
-class simulate:
+class simulate():
 
 	def __init__(self):
 		weatherF = open('weather.csv', 'r')
@@ -71,7 +67,7 @@ class simulate:
 		e = 6.11 * ( 10**( 7.5*temp_o/(237.3+temp_o) ) )
 		ep = e * RH / 100
 		Xo = 0.622*ep / ( P - 0.378*ep )
-		print('Xo :', Xo)
+#		print('絶対湿度 :', Xo)
 		return Xo
 
 
@@ -79,7 +75,7 @@ class simulate:
 	def calc_Xr(self, temp_o, P):
 		es = math.exp(6.414672 + 0.07266115*temp_o)
 		Xr = (0.622 * es) / P
-		print('Xr :', Xr)
+#		print('路面温度に対する飽和絶対湿度 :', Xr)
 		return Xr
 
 
@@ -87,33 +83,33 @@ class simulate:
 	def calc_Xs(self, temp_o, P):
 		es = math.exp(6.414548 + 0.08238957*temp_o)
 		Xs = (0.622 * es) / P
-		print('Xs :', Xs)
+#		print('雪表温度に対する飽和絶対湿度 :', Xs)
 		return Xs
 
 
 	# 降雪の密度(ro_f)
 	def calc_ro_f(self, temp_o):
 		ro_f = 1000 / (0.091*temp_o*temp_o - 1.81*temp_o + 9.47)
-		print('ro_f :', ro_f)
+		print('降雪の密度 :', ro_f)
 		return ro_f
 
 
 	# 対流熱伝達率(alpha_c)
 	def calc_alpha_c(self, V):
 		alpha_c = 7.4 + V
-		print('alpha_c :', alpha_c)
+#		print('対流熱伝達率 :', alpha_c)
 		return alpha_c
 
 	# alpha_x
 	def calc_alpha_x(self, V):
 		alpha_x = 0.0152*V + 0.0178
-		print('alpha_x :', alpha_x)
+#		print('alpha_x :', alpha_x)
 		return alpha_x
 
 	# alpha_i
 	def calc_alpha_i(self):
 		alpha_i = 5000 + (2/3)*vw
-		print('alpha_i :', alpha_i)
+#		print('alpha_i :', alpha_i)
 		return alpha_i
 	
 
@@ -122,7 +118,7 @@ class simulate:
 		if(temp_o > 2):	rs = 0
 		elif(temp_o<0):	rs = 1
 		else:			rs = 1 - (temp_o/2)
-		print('rs :', rs)
+		print('降雪の氷の割合 :', rs)
 		return rs
 
 
@@ -130,14 +126,14 @@ class simulate:
 	# 温水温度(パイプ中間)
 	def calc_temp_w(self, on_t):
 		temp_w = 0.05 * on_t
-		print('temp_w :', temp_w)
+		print('温水温度 :', temp_w)
 		return temp_w
 
 
 	# 相当外気温(temp_e)
 	def calc_temp_e(self, temp_o, I, alpha_c):
 		temp_e = temp_o + (a*I - epsilon*R) / (alpha_c + alpha_r)
-		print('temp_e :', temp_e)
+#		print('相当外気温 :', temp_e)
 		return temp_e
 
 
@@ -145,6 +141,7 @@ class simulate:
 	def calc_M(self, S_1, elapsed_t, rs, F):
 		if(elapsed_t==0):	M = 0
 		else:				M = (S_1/elapsed_t) + (rs*F)
+		print('融雪量 :', M)
 		return M
 
 	def recalc_M(self, S_1, elapsed_t, rs, F):
@@ -166,13 +163,14 @@ class simulate:
 				ro_s = 1
 			else:
 				ro_s = (S_1 + F*elapsed_t - M*elapsed_t) / ( S_1/ro_s_1 + F*elapsed_t/ro_f - M*elapsed_t/ro_i )
-		print('ro_s :', ro_s)
+		print('降雪の密度 :', ro_s)
 		return ro_s
 
 
 	# 路面の雪氷量(S)
 	def calc_S(self, S_1, rs, F, M, elapsed_t):
 		S = S_1 + (rs*F - M)*elapsed_t
+		print('路面の雪氷量 :', S)
 		return S
 
 
@@ -180,7 +178,7 @@ class simulate:
 	def calc_dw(self):
 		#dw = W / (ro_w - ro_s)
 		dw = 0
-		print('dw :', dw)
+#		print('水分の路面からの浸透高さ :', dw)
 		return dw
 
 
@@ -188,6 +186,7 @@ class simulate:
 	def calc_ds(self, S, ro_s):
 		if(ro_s==0):	ds = 0
 		else:			ds = S / ro_s
+		print('路面の積雪深 :', ds)
 		return ds
 
 
@@ -195,14 +194,14 @@ class simulate:
 	def calc_Er(self, alpha_x, Xr, Xo, S):
 		if(S>0):	Er = 0
 		else:		Er = alpha_x * (Xr - Xo)
-		print('Er :', Er)
+		print('路面からの蒸発量 :', Er)
 		return Er
 
 
 	# 路面から外界への潜熱伝熱量(Qer)
 	def calc_Qer(self, Er):
 		Qer = Le * Er
-		print('Qer :', Qer)
+		print('路面から外界への潜熱伝熱量 :', Qer)
 		return Qer
 
 
@@ -210,7 +209,7 @@ class simulate:
 	def calc_Qas(self, alpha_c, ds, dw, temp_e):
 		Ks = 1 / ( (1/alpha_c) + (ds-dw)/ks )
 		Qas = -1 * Ks * temp_e
-		print('Qas :', Qas)
+		print('雪から外界への顕熱伝熱量 :', Qas)
 		return Qas
 		#alpha_c -> alpha_o ???
 
@@ -218,18 +217,19 @@ class simulate:
 	# 雪面からの蒸発量(Es)
 	def calc_Es(self, alpha_x, Xs, Xo):
 		Es = alpha_x * (Xs - Xo)
-		print('Es :', Es)
+		print('雪面からの蒸発量 :', Es)
 		return Es
 
 	# 雪から外界への潜熱伝熱量(Qes)
 	def calc_Qes(self, Es):
 		Qes = Le * Es
-		print('Qes :', Qes)
+		print('雪から外界への潜熱伝熱量 :', Qes)
 		return Qes
 
 	# 融雪熱量(Qm)
 	def calc_Qm(self, M):
 		Qm = Lm * M
+		print('融雪熱量 :', Qm)
 		return Qm
 
 
@@ -237,7 +237,7 @@ class simulate:
 	def calc_Qs(self, Qas, Qes, Qm):
 		#Qs = alpha_m * (temp_r - temp_s)
 		Qs = Qas + Qes + Qm
-		print('Qs :', Qs)
+		print('路面から相変化中の雪への伝熱量 :', Qs)
 		return Qs
 
 
@@ -252,6 +252,7 @@ class simulate:
 			temp_r = temp_r_1
 		'''
 		temp_r = Qs/alpha_m + temp_s
+		print('路面の温度 :', temp_r)
 		return temp_r
 
 
@@ -259,7 +260,7 @@ class simulate:
 	def calc_Qar(self, temp_r, temp_e, alpha_c, ds):
 		Ks = 1 / ( 1/alpha_c + ds/ks )
 		Qar = Ks * ( temp_r - temp_e )
-		print('Qar :', Qar)
+		print('路面から外界への顕熱伝熱量 :', Qar)
 		return Qar
 		#alpha_c -> alpha_o???
 
@@ -281,21 +282,22 @@ class simulate:
 		elif(bigM==True):
 			E = (W_1/elapsed_t) + (1-rs)*F + M
 			f = (E-Er) / (Es-Er)
-		print('f :', f)
-		print('E :', E)
+		print('路面のうち雪氷あるいは水分の相変化に寄与する面積の割合 :', f)
+#		print('E :', E)
 		return f, E
 
 
 	# 路面放熱量(Qr)
 	def calc_Qr(self, f, Qs, Qar, Qer):
 		Qr = f*Qs + ( 1.0 - f )*( Qar + Qer )
-		print('Qr :', Qr)
+		print('路面放熱量 :', Qr)
 		return Qr
 
 
 	# 路面の水分量(W)
 	def calc_W(self, W_1, rs, F, M, E, elapsed_t):
 		W = W_1 + ( (1-rs)*F + M - E )*elapsed_t
+		print('路面の水分量 :', W)
 		return W
 
 
@@ -303,7 +305,7 @@ class simulate:
 	def calc_Qp(self, temp_w, temp_r, alpha_i):
 		Kp = 1 / ( 1/(2*pi*alpha_i*ri) + (math.log(ro/ri)/(2*pi*kp)) )
 		Qp = Kp * ( temp_w - temp_r )
-		print('Qp :', Qp)
+#		print('パイプ放熱量 :', Qp)
 		return Qp
 
 
@@ -316,8 +318,8 @@ class simulate:
 
 
 	# 結果出力
-	def result_ouput(self, datetime, M, S, ds, Qm, temp_r, W):
-		outf = open('result_simulate.txt', 'a')
+	def result_output(self, datetime, M, S, ds, Qm, temp_r, W):
+		outf = open('result_simulate.csv', 'a')
 		result = str(datetime)+', '+str(M)+', '+str(S)+', '+str(ds)+', '+str(Qm)+', '+str(temp_r)+', '+str(W)+'\n'
 		print(result)
 		outf.write(result)
@@ -379,7 +381,7 @@ if __name__ == '__main__':
 	W_1 = W
 	ro_s_1 = ro_s
 
-	simulate().result_ouput(datetime, M, S, ds, Qm, temp_r, W)
+	simulate().result_output(datetime, M, S, ds, Qm, temp_r, W)
 
 	roopnum = len(simulate().weathers)
 	for n in range(roopnum-1):
@@ -443,4 +445,4 @@ if __name__ == '__main__':
 		W_1 = W
 		ro_s_1 = ro_s
 		
-		simulate().result_ouput(datetime, M, S, ds, Qm, temp_r, W)
+		simulate().result_output(datetime, M, S, ds, Qm, temp_r, W)
