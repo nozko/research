@@ -1,0 +1,63 @@
+ road.mdl                       1
+ heat                         668
+      pipe10                        11           1
+ pipe1                        669
+      heat                          11           1
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+ pipe2                        670
+      pipe1                         11           1
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+ pipe3                        671
+      pipe2                         11           1
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+ pipe4                        672
+      pipe3                         11           1
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+ pipe5                        673
+      pipe4                         11           1
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+          11  road.mdl            
+ pipe6                        674
+      pipe5                         11           1
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+ pipe7                        675
+      pipe6                         11           1
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+ pipe8                        676
+      pipe7                         11           1
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+ pipe9                        677
+      pipe8                         11           1
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+ pipe10                       678
+      pipe9                         11           1
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
+          12  road.mdl            
