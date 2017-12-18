@@ -109,6 +109,7 @@ C
         END IF          
         IF (NSD(IP).EQ.1) THEN
           AT=AT+AS(IP)
+          print *, 'TEST!', AS(IP)		!test
           BS(IP)=BS0
           DPH(IP)=DPH0
           BDPH(IP)=DPH0
