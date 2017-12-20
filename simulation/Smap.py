@@ -6,6 +6,7 @@ import math
 import numpy as np
 import re
 import math
+import time
 
 RD   = 3.1416 / 180
 pido = 43.04
@@ -48,7 +49,7 @@ class sim:
 		AE = -0.000278641 + 0.122772*math.cos(w+1.49831) \
 			- 0.165458*math.cos(2*w-1.26155) - 0.00535383*math.cos(3*w-1.1571)
 		sjik = 15 * (TM-12+AE) + pked - 135
-		SH = math.sin(pido*RD)*math.sin(Del*RH) \
+		SH = math.sin(pido*RD)*math.sin(Del*RD) \
 			+ math.cos(pido*RD)*math.cos(Del*RD)*math.cos(sjik*RD)
 		if(SH<=0):
 			SH = 0
@@ -75,39 +76,8 @@ class sim:
 
 if __name__ == '__main__':
 
-	BT = []
-	Q = []
-	E = []
-	tset = []
-	ID = []
-	QQ = []
-	npn = []
-	nsd = []
-	nqd = []
-	C = []
-	CR = []
-	AS = []
-	iopt = []
-	iope = []
-	iopq = []
-	CL = []
-	ict = []
 	nsca = np.zeros(100)
-	NP = []
-	nkr = []
 	HR = []
-	S1 = []
-	S2 = []
-	TT = []
-	ER = []
-	flr = []
-	IL = []
-	snow = []			# amount of snow and ice
-	Scover = []
-	mlt = []
-	NC = []
-	Theight = []
-	Tcover = []
 
 	snow_minusT = 0
 	wet_minusT  = 0
@@ -124,7 +94,7 @@ if __name__ == '__main__':
 	heater = 0		# on(1) / off(0)
 	irt    = 0
 	melt   = 0		# melted snow
-	tmr    = 0
+	noPreT = 0		# no precipitation time
 	lpmx   = 0
 	lpr    = 1
 	ntime  = np.zeros((2, 3))
@@ -132,13 +102,13 @@ if __name__ == '__main__':
 	Qr2 = 0		# Q from surface(snowing, plus temperature) @moist sensor node
 
 
-	interval   = 0.1		# calculatioin interval
-	diffM      = 1			# difference method(1:後退差分)
-	CK         = 1.0		# 緩和係数(0.7~1.5程度)
-	maxloop    = 100		# maximum number of loops(200)
+	interval = 0.1		# calculatioin interval
+	diffM    = 1			# difference method(1:後退差分)
+	CK       = 1.0		# 緩和係数(0.7~1.5程度)
+	maxloop  = 100		# maximum number of loops(200)
 	print('interval :', interval)
 
-	idx    = int( 1/(interval+0.4) )
+	idx = int( 1/(interval+0.4) )
 
 	Dstart = 1		# day to start calculation(days from top of the file)
 	lyear  = 1		# number of years to calculate(1~)
@@ -151,8 +121,6 @@ if __name__ == '__main__':
 	Qs      = float(smap4[0])	# Q of heat source
 	flowR   = 40				# flow rate of antifreeze
 	maxT    = 70				# maximum temperature of heat source
-	Tsensor = int(smap4[3])		# number of node(temperature sensor)
-	Wsensor = 77				# number of node(moist sensor)
 	timer   = float(smap4[5])	# delay time
 	step    = int(smap4[6])		# rotation step
 	circuit = int(smap4[7])		# number of rotatioin circuit
@@ -181,73 +149,53 @@ if __name__ == '__main__':
 
 
 	line_num = 0
-	ipx = int(sim().net.readlines()[line_num])		# data num
 
 	# array initialize
-	QE    = np.zeros(ipx)
-	BF    = np.zeros(ipx)
-	W     = np.zeros(ipx)		# water
-	SS    = np.zeros(ipx)
-	WW    = np.zeros(ipx)
-	EV    = np.zeros(ipx)
-	htr   = np.zeros(ipx)
-	sat   = np.zeros(ipx)		# 相当外気温 Sol-Air Temperature
-	smf   = np.zeros(ipx)
-	cover = np.zeros(ipx)		# snow cover
+	QE    = 0
+	BF    = 0
+	W     = 0		# water
+	SS    = 0
+	WW    = 0
+	EV    = 0
+	htr   = 0
+	sat   = 0		# 相当外気温 Sol-Air Temperature
+	smf   = 0
+	cover = 0		# snow cover
 
-	### read all data in 'file.net'
-	for ip in range(ipx):
+	line_num += 1
+	net1 = re.split(" +", sim().net.readlines()[line_num])
+	BT = float(net1[2])
+	C  = float(net1[4])
+	CL = float(net1[5])
+
+	line_num += 1
+	net2 = re.split(" +", sim().net.readlines()[line_num])
+	nsd = float(net2[1])
+	AS  = float(net2[2])
+	QQ  = float(net2[4])
+
+	Scover = 0
+	snow   = 0
+
+	line_num += 1
+
+	if(int(net2[1])==1):
+		area   = area + float(net2[2])
+		snow   = snow0
+		Scover = Scover0
+		cover  = Scover0
+
+	line_num += 1
+	net4 = re.split(" +", sim().net.readlines()[line_num])
+	npn = int(net4[1])
+	for j in range(int(net4[1])):
 		line_num += 1
-		net1 = re.split(" +", sim().net.readlines()[line_num])
-		BT.append(float(net1[2]))
-		ID.append(float(net1[3]))
-		C.append(float(net1[4]))
-		CL.append(float(net1[5]))
-		print(ID)
+		net4j = re.split(" +", sim().net.readlines()[line_num])
+		HR.append(float(net4j[3]))
 
-		line_num += 1
-		net2 = re.split(" +", sim().net.readlines()[line_num])
-		nsd.append(float(net2[1]))
-		AS.append(float(net2[2]))
-		nqd.append(float(net2[3]))
-		QQ.append(float(net2[4]))
-
-		Scover.append(0)
-		snow.append(0)
-
-		line_num += 1
-		net3 = re.split(" +", sim().net.readlines()[line_num])
-		iopt.append(int(net3[1]))
-		iopq.append(float(net3[2]))
-		iope.append(float(net3[3]))
-		if(int(net2[1])==1):
-			area = area + float(net2[2])
-			snow.append(snow0)
-			Scover.append(Scover0)
-			cover[ip] = Scover0
-
-		line_num += 1
-		net4 = re.split(" +", sim().net.readlines()[line_num])
-		npn.append(int(net4[1]))
-		_NP = []
-		_nkr = []
-		_HR = []
-		for j in range(int(net4[1])):
-			line_num += 1
-			net4j = re.split(" +", sim().net.readlines()[line_num])
-			_NP.append(int(net4j[1]))
-			_nkr.append(float(net4j[2]))
-			_HR.append(float(net4j[3]))
-		NP.append(_NP)
-		nkr.append(_nkr)
-		HR.append(_HR)
-
-		flr.append(0)
+	flr = 0
 
 	sim().net.close()
-
-
-	ih = ipx - 1
 
 
 	### day loop ###
@@ -260,6 +208,7 @@ if __name__ == '__main__':
 
 
 		### time loop ###
+
 		for hour in range(24):
 			t0 = temp_o
 			data1 = sim().data.readlines()[ (Lday-1)*24+hour ].split(',')
@@ -280,14 +229,19 @@ if __name__ == '__main__':
 
 			sun = sun/4.186*1000
 
+
+			# there is vapor in the air
 			if(vaporP >= 0):
 				absH = 0.622*vaporP/(1013.25-vaporP)	# absolute humidity
-				RH = vaporP*760/1013.25
+				# nighttime radiation when there is a cloud
 				if(cloud >= 0):
+					RH = vaporP*760/1013.25
 					nightR = 0.0000000488 * (tempA+273.16)**4 \
 							* (1-0.62*cloud/10) * (0.49-0.076*math.sqrt(RH))
+			# no vapor in the air
 			else:
 				absH = 0.7 * sim().abshumid(tempA)
+
 
 			for idt in range(idx):
 				TM = hour - 1 + interval*idt
@@ -296,9 +250,10 @@ if __name__ == '__main__':
 				print('temp_o :', temp_o, '℃ ')
 				Wspeed = Wspeed0 * windC
 
+				# amount of snow and rain in precipitation
 				if(temp_o < 0):
-					Fs = pre		# amount of snow in precipitation
-					Fr = 0			# smount of rain in precipitation
+					Fs = pre
+					Fr = 0
 				elif(temp_o>=0 and temp_o<2):
 					Fs = pre * (2-temp_o)/2
 					Fr = pre * temp_o / 2
@@ -323,197 +278,156 @@ if __name__ == '__main__':
 				erx = 0
 				L1 = 0
 				L2 = 0
-				if(heater==0):
-					pmx = 0
-					ptl = 0
-					ptm = 0
-				if(pre > 0):
-					ptl = ptl + pre*interval
-					ptm = ptm + interval
-				if(pre > pmx):
-					pmx = pre
-				if(snowT==99):
-					wetT = pmx * 2
-					if(wetT < 2):	wetT = 2
-					B1 = wetT
-					B2 = wetT
-				if(snowT==999):
-					wetT = pmx + 2
-					dryT = wetT
-					B1 = wetT
-					B2 = wetT
-					B3 = wetT
-				tmr = tmr + interval
 
-				if(pre > 0):	tmr = 0
+				noPreT = noPreT + interval
+				if(pre > 0):	noPreT = 0
+
+
+				# Novenber -> April
 				if(month<=4 or month>=11):
+					# snowing
 					if(pre > 0):
 						level = 0
-					else:
-						if( (snow[Wsensor]+W[Wsensor]) > 0 ):
-							level = 1
-						else:
-							level = 2
-					if(level==0):
 						TN = snowT + B1*temp_o
 						TF = TN + stopT1
-					elif(level==1):
-						TN = wetT + B2*temp_o
-						TF = TN + stopT2
-					elif(level==2):
-						TN = dryT + B3*temp_o
-						TF = TN + stopT3
+					# not snowing
+					else:
+						# wet
+						if( (snow+W) > 0 ):
+							level = 1
+							TN = wetT + B2*temp_o
+							TF = TN + stopT2
+						# dry
+						else:
+							level = 2
+							TN = dryT + B3*temp_o
+							TF = TN + stopT3
+
 
 					# decide on/off
-					if(BT[Tsensor] < TN):		heater = 1
-					elif(BT[Tsensor] > TF):		heater = 0
-					if(tmr > timer+0.0001):		heater = 0
+					if(BT < TN):		heater = 1
+					elif(BT > TF):		heater = 0
+					if(noPreT > timer+0.0001):	heater = 0
 					if(temp_o > offT):			heater = 0
 
+					# when heater off
 					if(heater==0):
 						irt = -1
-						imo = 0
+					# when heater on
 					elif(heater==1):
 						irt += 1
 						IA = irt % (circuit*step)	# circuit*step : rotation time
-						if(IA < step*3):	imo = 1
 					ntime[heater][level] += 1
 
-				for ip in range(ipx):
-					E.append(0)
-					Q.append(0)
-					NC.append(0)
-					mlt.append(0)
-					ict.append(0)
 
-					if(ID[ip]==2):
-						tset.append(temp_o)
-						ict[ip] = 1
-					elif(ID[ip]==9):
-						tset.append(BT[ip])
-						ict[ip] = 1
+				E = 0
+				Q = 0
+				NC = 0
+				mlt = 0
+				ict = 0
 
-					if(nqd[ip]==1):
-						Q[ip] = QQ[ip]
-					elif(nqd[ip]==11):
-						if(heater==1):
-							ih = ip - 1
-							Q[ip] = Qs
-							ict[ip] = 0
+				# when heater on
+				if(heater==1):
+					Q = Qs
+					erot = erot + Q
 
-					if(heater==1):
-						if(ID[ip]==10):		# normal heater
-							Q[ip] = Qs
-							erot = erot + Q[ip]
-						elif(ID[ip]>=11 and ID[ip]<=13):
-							Q[ip] = Qs * 0.5
-							if(imo==1):	Q[ip] = Qs*2
-							erot = erot + Q[ip]
+				CR = C
+				if(CL > 0):
+					if(BT > tvm):
+						CR = C + CL
+					else:
+						CR = C + CL*0.5
+					Q = flr
+					if(IL==1):
+						tic = BT
+						pic = (pcth-tic) / (pcth-pctl)
+						CR = C + CL*(1-pic) \
+								+ CL*0.5*pic + CL*80/abs(pcth-pctl)
 
-					for j in range(npn[ip]):
-						if(nkr[ip][j]==11):
-							HR[ip][j] = 0
-							if(heater==1):
-								HR[ip][j] = flowR
-							flow = HR[ip][j]
-
-					CR.append(C[ip])
-					if(CL[ip] > 0):
-						if(BT[ip] > tvm):
-							CR[ip] = C[ip] + CL[ip]
-						else:
-							CR[ip] = C[ip] + CL[ip]*0.5
-						Q[ip] = flr[ip]
-						if(IL[ip]==1):
-							tic = BT[ip]
-							pic = (pcth-tic) / (pcth-pctl)
-							CR[ip] = C[ip] + CL[ip]*(1-pic) \
-									+ CL[ip]*0.5*pic + CL[ip]*80/abs(pcth-pctl)
-
-					if(nsd[ip]==1):
-						abrate = 0.8 - 30*cover[ip]
-						if(abrate < abrate0):	abrate = abrate0
-						sat[ip] = ( temp_o \
-								+ (abrate*sun-0.9*nightR)/(sim().funa(Wspeed)+4) )
-						EV[ip] = 0
-						TS = BT[ip]
-						lps = 0
-						dps = cover[ip]
-						if( (snow[ip]+Fs)>0 ):
-							if(TS<0 or sat[ip]>0):
-								mlt[ip] = 1
-						if( (W[ip]+Fr)>0 ):
-							if(TS < 0):
-								mlt[ip] = 1
-						if( (snow[ip]+Fs)>0 and (W[ip]+Fr)>0 ):
-							mlt[ip] = 1
-						peneH = 0			# penetration height
-						if(cover[ip] > 0):
-							peneH = W[ip] / (1000 - snow[ip]/cover[ip])
-							# snow[ip]/cover[ip] : density of snow cover
-						else:
-							peneH = W[ip] / 1000
-						if(peneH > maxPene):
-							peneH = maxPene
-						wat = W[ip] + Fr*interval
+				if(nsd==1):
+					abrate = 0.8 - 30*cover
+					if(abrate < abrate0):	abrate = abrate0
+					sat = ( temp_o \
+							+ (abrate*sun-0.9*nightR)/(sim().funa(Wspeed)+4) )
+					EV = 0
+					TS = BT
+					lps = 0
+					dps = cover
+					if( (snow+Fs)>0 ):
+						if(TS<0 or sat>0):
+							mlt = 1
+					if( (W+Fr)>0 ):
+						if(TS < 0):
+							mlt = 1
+					if( (snow+Fs)>0 and (W+Fr)>0 ):
+						mlt = 1
+					peneH = 0			# penetration height
+					if(cover > 0):
+						peneH = W / (1000 - snow/cover)
+						# snow/cover : density of snow cover
+					else:
+						peneH = W / 1000
+					if(peneH > maxPene):
+						peneH = maxPene
+					wat = W + Fr*interval
 
 
-						while(True):
-							SM = 0		# amount of melted snow(?)
-							EV[ip] = 0
-							BF[ip] = 0
-							if(mlt[ip]==1):
-								DH = dps - peneH
-								if(DH<=0 or sat[ip]>0):
-									DH = 0
-									tsv = 0
-									EV[ip] = 4 * sim().funa(Wspeed) \
-											* (sim().abshumid(tsv)-absH)
-									wat = W[ip] + (Fr-EV[ip])*interval
-									if(wat < 0):
-										EV[ip] = W[ip]/interval + Fr
-										wat = 0
-								htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
-								SM0 = (200*TS + htrm*sat[ip] - 590*EV[ip]) \
-										* interval/80
-								SM = SM0
-								BF[ip] = 1
-								if(SM0 < -1*wat):
-									SM = -1 * wat
-									BF[ip] = SM / SM0
-								elif( SM0 > (snow[ip]+Fs*interval) ):
-									SM = snow[ip] + Fs*interval
-									BF[ip] = SM / SM0
-							elif(mlt[ip]==0):
-								tsv = BT[ip]
-								EV[ip] = 4 * sim().funa(Wspeed)\
-										* (sim().abshumid(tsv)- absH)
-								if( EV[ip] > (W[ip]/interval + Fr) ):
-									EV[ip] = W[ip]/interval + Fr
+					while(True):
+						SM = 0		# amount of melted snow(?)
+						EV = 0
+						BF = 0
+						if(mlt==1):
+							DH = dps - peneH
+							if(DH<=0 or sat>0):
+								DH = 0
+								tsv = 0
+								EV = 4 * sim().funa(Wspeed) \
+										* (sim().abshumid(tsv)-absH)
+								wat = W + (Fr-EV)*interval
+								if(wat < 0):
+									EV = W/interval + Fr
+									wat = 0
+							htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
+							SM0 = (200*TS + htrm*sat - 590*EV) \
+									* interval/80
+							SM = SM0
+							BF = 1
+							if(SM0 < -1*wat):
+								SM = -1 * wat
+								BF = SM / SM0
+							elif( SM0 > (snow+Fs*interval) ):
+								SM = snow + Fs*interval
+								BF = SM / SM0
+						elif(mlt==0):
+							tsv = BT
+							EV = 4 * sim().funa(Wspeed)\
+									* (sim().abshumid(tsv)- absH)
+							if( EV > (W/interval + Fr) ):
+								EV = W/interval + Fr
 
-							htr[ip] = 1 / (1/(sim().funa(Wspeed)+4) + dps/0.08)
-							QE[ip]  = -590*EV[ip] * AS[ip] * (1-BF[ip])
-							SS[ip]  = snow[ip] - SM + Fs*interval
-							WW[ip]  = W[ip] + SM + (Fr-EV[ip])*interval
-							smf[ip] = SM
+						htr = 1 / (1/(sim().funa(Wspeed)+4) + dps/0.08)
+						QE  = -590*EV * AS * (1-BF)
+						SS  = snow - SM + Fs*interval
+						WW  = W + SM + (Fr-EV)*interval
+						smf = SM
 
-							if(SS[ip] > 0):
-								if(SM > 0):
-									G = (snow[ip] + Fs*interval) \
-										/ (cover[ip] + Fs*interval/sfdens)
-									Scover[ip] = SS[ip] / G
-								else:
-									Scover[ip] = cover[ip] + Fs*interval/sfdens \
-													- SM/916
+						if(SS > 0):
+							if(SM > 0):
+								G = (snow + Fs*interval) \
+									/ (cover + Fs*interval/sfdens)
+								Scover = SS / G
 							else:
-								Scover[ip] = 0
+								Scover = cover + Fs*interval/sfdens \
+												- SM/916
+						else:
+							Scover = 0
 
-							ddps = (Scover[ip]+cover[ip])/2 - dps
-							if(abs(ddps)>0.001 and lps<10):
-								dps = 0.7*ddps + dps
-								lps += 1
-							else:
-								break
+						ddps = (Scover+cover)/2 - dps
+						if(abs(ddps)>0.001 and lps<10):
+							dps = 0.7*ddps + dps
+							lps += 1
+						else:
+							break
 
 
 				# matrix
@@ -523,44 +437,40 @@ if __name__ == '__main__':
 					lps = 0
 
 					while(True):
-						for ip in range(ipx):
-							if(ict[ip]==1):
-								T[ip] = tset[ip]
-								E[ip] = 0
-							S1.append( (Q[ip]+QE[ip]+E[ip])*interval \
-											+ BT[ip]*CR[ip] )
-							S2.append( CR[ip] )
+						if(ict==1):
+							T = tset
+							E = 0
+						S1 = (Q+QE+E)*interval + BT*CR
+						S2 = CR
 
-							for j in range(npn[ip]):
-								np_n = NP[ip][j]
-								tmp = diffM*T[np_n-1] \
-									+ (1-diffM)*(BT[np_n-1]-BT[ip])
-								S1[ip] = S1[ip] + HR[ip][j]*(tmp)*interval
-								S2[ip] = S2[ip] + diffM*HR[ip][j]*interval
+						for j in range(npn):
+							tmp = diffM * T
+							S1 = S1 + HR[j]*(tmp)*interval
+							S2 = S2 + diffM*HR[j]*interval
 
-							if(nsd[ip]==1):
-								F = BF[ip]
-								tmp = (1-F)*htr[ip]*sat[ip] \
-									- F*200*(1-diffM)*BT[ip] \
-									- (1-F)*htr[ip]*(1-diffM)*BT[ip]
-								S1[ip] = S1[ip] + ( tmp )*interval*AS[ip]
-								S2[ip] = S2[ip] \
-										+ (F*200+(1-F)*htr[ip])\
-											*interval*AS[ip]*diffM
-							if(ict[ip]==1):
-								E[ip] = (S2[ip]*tset[ip] - S1[ip]) / interval
+						if(nsd==1):
+							F = BF
+							tmp = (1-F)*htr*sat \
+								- F*200*(1-diffM)*BT \
+								- (1-F)*htr*(1-diffM)*BT
+							S1 = S1 + ( tmp )*interval*AS
+							S2 = S2 \
+									+ (F*200+(1-F)*htr)\
+										*interval*AS*diffM
+						if(ict==1):
+							E = (S2*tset - S1) / interval
+						else:
+							if(diffM<=0.01):
+								T = S1 / S2
+								erx = 0
 							else:
-								if(diffM<=0.01):
-									T[ip] = S1[ip] / S2[ip]
-									erx = 0
-								else:
-									TT.append( S1[ip] / S2[ip] )
-									ER.append( TT[ip] - T[ip] )
-									aer = abs(ER[ip])
-									if(aer > erx):
-										erx = aer
-										ier = ip
-									T[ip] = CK*ER[ip] + T[ip]
+								TT = S1 / S2
+								ER = TT - T
+								aer = abs(ER)
+								if(aer > erx):
+									erx = aer
+									ier = 0
+								T = CK*ER + T
 
 						lps += 1
 						if(lps > maxloop):
@@ -573,69 +483,68 @@ if __name__ == '__main__':
 								break
 
 					if(ilp < 2):
-						if( T[ih]>maxT and Q[ih]>0 ):
+						if( T>maxT and Q>0 ):
 							ilp += 1
-							tset[ih] = maxT
-							ict[ih] = 1
-							Q[ih] = 0
+							tset = maxT
+							ict = 1
+							Q = 0
 							erx = 0
 							continue
-						if(E[ih] < 0):
+						if(E < 0):
 							ilp += 1
-							ict[ih] = 0
-							E[ih] = 0
+							ict = 0
+							E = 0
 							erx = 0
 							continue
 						else:	break
 					else:	break
 
-				for ip in range(ipx):
-					if(CL[ip] > 0):
-						IL.append(0)
-						flr[ip] = 0
-						if( T[ip]<pcth and T[ip]>pctl ):
-							IL[ip] = 1
-						elif( BT[ip]>pcth and T[ip]<pcth ):
-							flr[ip] = (C[ip]+CL[ip]) * (T[ip]-pcth)
-							T[ip] = pcth
-							IL[ip] = 1
-						elif( BT[ip]>pctl and T[ip]<pctl ):
-							flr[ip] = (C[ip] + CL[ip]*80/abs(pcth-pctl)) \
-										* (T[ip]-pctl)
-							T[ip] = pctl
-						elif( BT[ip]<pctl and T[ip]>pctl ):
-							flr[ip] = (C[ip] + CL[ip]*0.5) * (T[ip]-pctl)
-							T[ip] = pctl
-							IL[ip] = 1
-						elif( BT[ip]<pcth and T[ip]>pcth ):
-							flr[ip] = (C[ip] + CL[ip]*80/abs(pcth-pctl)) \
-										* (T[ip]-pcth)
-							T[ip] = pcth
+				if(CL > 0):
+					IL = 0
+					flr = 0
+					if( T<pcth and T>pctl ):
+						IL = 1
+					elif( BT>pcth and T<pcth ):
+						flr = (C+CL) * (T-pcth)
+						T = pcth
+						IL = 1
+					elif( BT>pctl and T<pctl ):
+						flr = (C + CL*80/abs(pcth-pctl)) \
+									* (T-pctl)
+						T = pctl
+					elif( BT<pctl and T>pctl ):
+						flr = (C + CL*0.5) * (T-pctl)
+						T = pctl
+						IL = 1
+					elif( BT<pcth and T>pcth ):
+						flr = (C + CL*80/abs(pcth-pctl)) \
+									* (T-pcth)
+						T = pcth
 
-					if(nsd[ip]==1):
-						if( level==0 and T[ip]<0 ):
-							L1 = 1
-						elif( level==1 and T[ip]<0 ):
-							L2 = 1
-						if(SS[ip] < 0):
-							SS[ip] = 0
-						if(WW[ip] < 0):
-							WW[ip] = 0
-						if(Scover[ip] > FD):
-							FD = Scover[ip]
+				if(nsd==1):
+					if( level==0 and T<0 ):
+						L1 = 1
+					elif( level==1 and T<0 ):
+						L2 = 1
+					if(SS < 0):
+						SS = 0
+					if(WW < 0):
+						WW = 0
+					if(Scover > FD):
+						FD = Scover
 
-						sca = sca + SS[ip]*AS[ip]/area
-						water = water + WW[ip]*AS[ip]/area
-						evaporate = evaporate + EV[ip]*interval*AS[ip]/area
-						ssmf = ssmf + smf[ip]*AS[ip]/area
+					sca = sca + SS*AS/area
+					water = water + WW*AS/area
+					evaporate = evaporate + EV*interval*AS/area
+					ssmf = ssmf + smf*AS/area
 
-						if( Scover[ip]>0 and SS[ip]>0 ):
-							GM = SS[ip] / Scover[ip]
-							EE = 16 * math.exp(0.021*GM)
-							GM = GM * math.exp( SS[ip]/2/EE*interval/24 )
-							if(GM > 916):
-								GM = 916
-							Scover[ip] = SS[ip] / GM
+					if( Scover>0 and SS>0 ):
+						GM = SS / Scover
+						EE = 16 * math.exp(0.021*GM)
+						GM = GM * math.exp( SS/2/EE*interval/24 )
+						if(GM > 916):
+							GM = 916
+						Scover = SS / GM
 				
 
 				if(FD > 0):
@@ -654,36 +563,37 @@ if __name__ == '__main__':
 
 				snow_minusT += L1
 				wet_minusT  += L2
-				SE = E[ih] + Q[ih] + erot
+				SE = E + Q + erot
 
 				if(SE > 0):
 					onT += 1
-					Qsup += se
+					Qsup += SE
 					rse = Qsup / onT
 
 				melt += ssmf
 
 				lpr += 1
 
-				if( pre>0 and T[ip]>0 ):
-					TS = diffM*T[Wsensor] + (1-diffM)*BT[Wsensor]
-					Qr2 = Qr2 + BF[Wsensor]*200*TS \
-							+ (1-BF[Wsensor])*htr[Wsensor]*(TS-sat[Wsensor])
+				if( pre>0 and T>0 ):
+					TS = diffM*T + (1-diffM)*BT
+					Qr2 = Qr2 + BF*200*TS \
+							+ (1-BF)*htr*(TS-sat)
 
-				for ip in range(ipx):
-					if(nsd[ip]==1):
-						if( (sca+pre)==0 and WW[ip]>remainW ):
-							WW[ip] = remainW	# remained water
-						W[ip] = WW[ip]
-						snow[ip] = SS[ip]
-						cover[ip] = Scover[ip]
-						if( pre>0 and T[ip]>0 ):
-							TS = diffM*T[ip] + (1-diffM)*BT[ip]
-							Qr_plus = BF[ip]*200*TS \
-										+ (1-BF[ip])*htr[ip]*(TS-sat[ip])
-							Qr = Qr + (Qr_plus)*AS[ip]
+				if(nsd==1):
+					if( (sca+pre)==0 and WW>remainW ):
+						WW = remainW	# remained water
+					W = WW
+					snow = SS
+					print('snow  :', snow)
+					cover = Scover
+					print('cover :', cover)
+					if( pre>0 and T>0 ):
+						TS = diffM*T + (1-diffM)*BT
+						Qr_plus = BF*200*TS \
+									+ (1-BF)*htr*(TS-sat)
+						Qr = Qr + (Qr_plus)*AS
 
-					BT[ip] = T[ip]
+				BT = T
 
 			Tsnow_off = ntime[0][0] * interval
 			Tsnow_on  = ntime[1][0] * interval
@@ -692,10 +602,12 @@ if __name__ == '__main__':
 			Tdry_off  = ntime[0][2] * interval
 			Tdry_on   = ntime[1][2] * interval
 			print('snow.on time :', Tsnow_on, '\tsnow.off time :', Tsnow_off, \
-				'\nwet.on time :', Twet_on, '\twet.off time :', Twet_off, \
-				'\ndry.on time :', Tdry_on, '\tdry.off time :', Tdry_off)
+				'\nwet.on time  :', Twet_on,  '\twet.off time  :', Twet_off, \
+				'\ndry.on time  :', Tdry_on,  '\tdry.off time  :', Tdry_off)
 			if(heater==0):	print('heater : off')
 			else:			print('heater : on')
+
+			time.sleep(3)
 
 		if( Lday!=Dend or Lyear!=lyear ):	continue
 
@@ -711,9 +623,9 @@ if __name__ == '__main__':
 		Qr2 = Qr2 * interval
 
 		for i in range(height+1):
-			Theight.append( nsca[i] * interval )
+			Theight = nsca[i] * interval
 		for i in range(slevel+1):
-			Tcover.append( nsca[i] * interval )
+			Tcover = nsca[i] * interval
 	
 		Tsnow_off = ntime[0][0] * interval
 		Tsnow_on  = ntime[1][0] * interval
@@ -721,6 +633,6 @@ if __name__ == '__main__':
 		Twet_on   = ntime[1][1] * interval
 		Tdry_off  = ntime[0][2] * interval
 		Tdry_on   = ntime[1][2] * interval
-		print('TIME\t', 'snow.on :', Tsnow_on, 'snow.off :', Tsnow_off, \
-						', wet.on :', Twet_on, 'wet.off :', Twet_off, \
-						', dry.on :', Tdry_on, 'dry.off :', Tdry_off)
+		print('snow.on :', Tsnow_on, '\tsnow.off :', Tsnow_off, \
+			'\nwet.on  :', Twet_on,  '\twet.off  :', Twet_off, \
+			'\ndry.on  :', Tdry_on,  '\tdry.off  :', Tdry_off)
