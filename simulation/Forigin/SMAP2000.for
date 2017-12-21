@@ -84,7 +84,6 @@ c
       END IF
       PCT=0
       BS0=DPH0*YMID
-      print *, 'test!', DPH0, YMID	!test
       CLOSE(4)
 C
       ITN=0
@@ -592,6 +591,7 @@ C
           END IF
           IF (SS(IP).LT.0) THEN
             SS(IP)=0
+          print *, 'TEST!', SS(IP)		!test
           END IF
           IF (WW(IP).LT.0) THEN
             WW(IP)=0

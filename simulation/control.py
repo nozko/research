@@ -173,14 +173,14 @@ if __name__ == '__main__':
 
 		Xo = simulate.calc_Xo(RH, temp_o, P)
 
-		Xr = simulate.calc_Xr(temp_o, P)
-		Xs = simulate.calc_Xs(temp_o, P)
-		ro_f = simulate.calc_ro_f(temp_o)
+		Xr      = simulate.calc_Xr(temp_o, P)
+		Xs      = simulate.calc_Xs(temp_o, P)
+		ro_f    = simulate.calc_ro_f(temp_o)
 		alpha_c = simulate.calc_alpha_c(V)
 		alpha_x = simulate.calc_alpha_x(V)
 		alpha_i = simulate.calc_alpha_i()
-		rs = simulate.calc_rs(temp_o)
-		temp_w = simulate.calc_temp_w(on_t)
+		rs      = simulate.calc_rs(temp_o)
+		temp_w  = simulate.calc_temp_w(on_t)
 
 		# 相対外気温
 		temp_e = simulate.calc_temp_e(temp_o, I, alpha_c)
