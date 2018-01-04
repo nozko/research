@@ -202,11 +202,11 @@ if __name__ == '__main__':
 			vaporP  = float(data1[6])		# [hPa] vapor pressure
 			Wspeed0 = float(data1[7])		# [m/s] wind speed
 			sun     = float(data1[8])		# [MJ/m^2] solar radiatioin
-			pre     = float(data1[9]/10)	# [mm/min] precipitation
+			pre     = float(data1[9])/10	# [mm/min] precipitation
 			cloud   = float(data1[10])		# cloud cover
 			nightR  = 45					# [W/m^2] nighttime radiation
 			print('\n'+'temperature :',temp_o,'℃ ', \
-					'\tprecipitation :',pre, '[mm/h]')
+					'\tprecipitation :',pre, '[mm/10min]')
 			data.close()
 
 			sun = sun/4.186*1000		# [kcal/m^2]
@@ -238,7 +238,6 @@ if __name__ == '__main__':
 				water = 0		# [kg/m^2] water amount
 				SE    = 0		# [kg/m^2] heat source calorific value
 				erot  = 0
-				evaporate = 0	# [kg/m^2] evaporation amount
 				ilp = 0
 				erx = 0
 
@@ -280,7 +279,7 @@ if __name__ == '__main__':
 					# Q from heat source [kcal/h]
 					Q = Qs
 					# sum of Q
-					erot = erot + Q*interval/60		# [kcal]
+					erot = erot + Q*interval/60.0		# [kcal]
 
 
 				# solar radiatioin absorption rate of snow
@@ -312,7 +311,7 @@ if __name__ == '__main__':
 
 
 				melt  = 0
-				evapo_plus = 0
+				evaporate = 0
 				BF = 0			# (?)
 				if(mlt==1):
 					DH = cover - peneH
@@ -320,46 +319,48 @@ if __name__ == '__main__':
 						DH  = 0
 						tsv = 0			# (?)
 						# evaporation amount
-						evapo_plus = 4 * sim().funa(Wspeed) \
+						evaporate = 4 * sim().funa(Wspeed) \
 									* (sim().abshumid(tsv)-absH)	# [kg/m^2/h]
 						# total water [kg/m^2]
-						wat = Water + rain_plus - evapo_plus*interval/60
+						wat = Water + rain_plus - evaporate*(interval/60.0)
 						# abnormal value correction
 						if(wat < 0):
-							evapo_plus  = Water/(interval/60) + rain_plus
+							evaporate  = Water/(interval/60.0) + rain_plus
 							wat = 0
 					htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
 
 					# calc amount of snow melting
-					melt = (200*TS + htrm*sat - 590*evapo_plus) * (interval/60)/80
+#					melt = (200*TS + htrm*sat - 590*evaporate) \
+#							* (interval/60.0)/80.0
+					melt = (2*TS + htrm*sat- 590*evaporate) * (interval/60.0)/80.0
 					BF   = 1			# (?)
 
 					# 算出された融雪量が水分量より多い時
 					if(melt < -1*wat):
 						melt = -1 * wat
 					# 算出された融雪量が存在していた雪より多い時
-					elif( melt > (snow+snow_plus*interval/60) ):
-						melt = snow + snow_plus*interval/60		# [kg/m^2]
+					elif( melt > (snow+snow_plus) ):
+						melt = snow + snow_plus		# [kg/m^2]
 					print('melt :', melt)
 
 				else:
 					tsv = BT			# (?)
-					evapo_plus = 4 * sim().funa(Wspeed)\
+					evaporate = 4 * sim().funa(Wspeed)\
 								* (sim().abshumid(tsv)- absH)
-					if( evapo_plus > (Water/interval/60 + rain_plus) ):
-						evapo_plus = Water/interval/60 + rain_plus
+					if( evaporate > (Water/(interval/60.0) + rain_plus) ):
+						evaporate = Water/(interval/60.0) + rain_plus
 
 				htr  = 1 / (1/(sim().funa(Wspeed)+4) + cover/0.08)
-				Qe   = -590*evapo_plus * area * (1-BF)
-				Snow = snow - melt + snow_plus*interval/60		# [kg/m^2]
-				water_plus = rain_plus - evapo_plus*interval/60	# [kg/m^2]
-				ww   = Water + melt + water_plus				# [kg/m^2]
+				Qe   = -590*evaporate*(interval/60.0) * area * (1-BF)
+				Snow = snow - melt + snow_plus						# [kg/m^2]
+				water_plus = rain_plus - evaporate*(interval/60.0)	# [kg/m^2]
+				ww   = Water + melt + water_plus					# [kg/m^2]
 
 				# snow accumulation (volume) [m]
 				if(Snow > 0):
 					if(melt > 0):
-						Scover = Snow / (snow + snow_plus*interval) \
-									/ (cover + snow_plus*interval/sfdens)
+						Scover = Snow / (snow + snow_plus) \
+									/ (cover + snow_plus/sfdens)
 					else:
 						Scover = cover + snow_plus/sfdens - melt/916
 				else:
@@ -368,44 +369,35 @@ if __name__ == '__main__':
 
 				T = BT
 
+
 				while(True):
-					lps = 0
+					if(ict==1):
+						T = tset
+						E = 0
+					S1 = (Q+Qe+E)*interval/60.0 + BT*C
+					S2 = C
 
-					while(True):
-						if(ict==1):
-							T = tset
-							E = 0
-						S1 = (Q+Qe+E)*interval/60 + BT*C
-						S2 = C
+					for j in range(npn):
+						tmp = T
+						S1 = S1 + HR[j]*(tmp)*interval/60.0
+						S2 = S2 + HR[j]*interval/60.0
 
-						for j in range(npn):
-							tmp = T
-							S1 = S1 + HR[j]*(tmp)*interval/60
-							S2 = S2 + HR[j]*interval/60
+					tmp = (1-BF)*htr*sat
+					S1 = S1 + ( tmp )*interval/60.0*area
+					S2 = S2 + (BF*200+(1-BF)*htr)*interval/60.0*area
+					if(ict==1):
+						E = (S2*tset - S1) / interval/60.0
+					else:
+						TT = S1 / S2
+						ER = TT - T
+						aer = abs(ER)
+						if(aer > erx):
+							erx = aer
+							ier = 0
+						T = CK*ER + T
 
-						tmp = (1-BF)*htr*sat
-						S1 = S1 + ( tmp )*interval/60*area
-						S2 = S2 + (BF*200+(1-BF)*htr)*interval/60*area
-						if(ict==1):
-							E = (S2*tset - S1) / interval/60
-						else:
-							TT = S1 / S2
-							ER = TT - T
-							aer = abs(ER)
-							if(aer > erx):
-								erx = aer
-								ier = 0
-							T = CK*ER + T
-
-						lps += 1
-						if(lps > maxloop):
-							break
-						else:
-							if(erx > 0.0001):
-								erx = 0
-							else:
-								if(lps > lpmx):	lpmx = lps
-								break
+					if(erx > 0.0001):
+						erx = 0
 
 					if(ilp < 2):
 						if( T>maxT and Q>0 ):
@@ -438,12 +430,11 @@ if __name__ == '__main__':
 
 
 				water = water + ww		# [kg/m^2]
-				evaporate = evaporate + evapo_plus*interval/60
 
 				if( Scover>0 and Snow>0 ):
 					gm = Snow / Scover
 					ee = 16 * math.exp(0.021*gm)
-					gm = gm * math.exp( Snow/2/ee*interval/60/24 )
+					gm = gm * math.exp( Snow/2/ee*interval/60.0/24 )
 					if(gm > 916):	gm = 916
 					Scover = Snow / gm		# [m]
 
@@ -487,8 +478,8 @@ if __name__ == '__main__':
 		onT         = onT * interval			# [min]
 		snow_minusT = snow_minusT * interval	# [min]
 		wet_minusT  = wet_minusT * interval		# [min]
-		Qsup        = Qsup * interval/60
-		Qr          = Qr * interval/60
+		Qsup        = Qsup * interval/60.0
+		Qr          = Qr * interval/60.0
 
 		Tsnow_off = ntime[0][0] * interval
 		Tsnow_on  = ntime[1][0] * interval

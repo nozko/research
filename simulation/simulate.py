@@ -383,8 +383,8 @@ if __name__ == '__main__':
 
 	simulate().result_output(datetime, M, S, ds, Qm, temp_r, W)
 
-	roopnum = len(simulate().weathers)
-	for n in range(roopnum-1):
+	loopnum = len(simulate().weathers)
+	for n in range(loopnum-1):
 
 		time.sleep(5)
 
