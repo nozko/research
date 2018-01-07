@@ -19,6 +19,12 @@ class control:
 
 	# control from snow accumulation
 	def judge_2(self, snow):
-		if(snow > 0):		heater = 1
+		if(snow > 0.1):		heater = 1
 		else:				heater = 0
+		return heater
+
+
+	# always off
+	def off(self):
+		heater = 0
 		return heater

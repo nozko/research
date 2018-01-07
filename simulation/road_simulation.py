@@ -9,6 +9,7 @@ import math
 import time
 import datetime
 import argparse
+import os
 
 import control_road
 
@@ -20,6 +21,8 @@ class sim:
 		self.net = open(fn1, 'r')
 		fn2 = 'smap.run'
 		self.run = open(fn2, 'r')
+		
+		self.logf = open('simulate_log.txt', 'a')
 
 		self.control = control_road.control()
 
@@ -102,6 +105,8 @@ if __name__ == '__main__':
 	parser.add_argument('weather')
 	args = parser.parse_args()
 
+	os.remove('simulate_log.txt')
+
 	snow_minusT = 0
 	wet_minusT  = 0
 
@@ -117,7 +122,7 @@ if __name__ == '__main__':
 	noPreT = 0		# no precipitation time
 	lpmx   = 0
 	ntime  = np.zeros((2, 3))
-	Qr  = 0		# Q from surface(snowing, more than 0℃ )
+	Qr     = 0		# Q from surface(snowing, more than 0℃ )
 
 
 	interval = 5		# [min] calculatioin interval (10の約数)
@@ -206,13 +211,15 @@ if __name__ == '__main__':
 			cloud   = float(data1[10])		# cloud cover
 			nightR  = 45					# [W/m^2] nighttime radiation
 			print('\n'+'temperature :',temp_o,'℃ ', \
-					'\tprecipitation :',pre, '[mm/10min]')
+					'\tprecipitation :',pre, '[mm/min]')
 			data.close()
 
 			sun = sun/4.186*1000		# [kcal/m^2]
 
 			date = '2017-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
 			date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
+
+			sim().logf.write(str(date) + '\n')
 
 
 			# absolute humidity, night R
@@ -264,6 +271,7 @@ if __name__ == '__main__':
 					# decide on/off
 #					heater = sim().control.judge_1(pre)
 					heater = sim().control.judge_2(snow)
+#					heater = sim().control.off()
 
 					ntime[heater][level] += 1
 
@@ -341,6 +349,8 @@ if __name__ == '__main__':
 					# 算出された融雪量が存在していた雪より多い時
 					elif( melt > (snow+snow_plus) ):
 						melt = snow + snow_plus		# [kg/m^2]
+					if(melt < 0):
+						melt = 0
 					print('melt :', melt)
 
 				else:
@@ -359,10 +369,12 @@ if __name__ == '__main__':
 				# snow accumulation (volume) [m]
 				if(Snow > 0):
 					if(melt > 0):
-						Scover = Snow / (snow + snow_plus) \
-									/ (cover + snow_plus/sfdens)
-					else:
+#						Scover = Snow / (snow + snow_plus) \
+#									/ (cover + snow_plus/sfdens)
 						Scover = cover + snow_plus/sfdens - melt/916
+					else:
+#						Scover = cover + snow_plus/sfdens - melt/916
+						Scover = cover + snow_plus/sfdens
 				else:
 					Scover = 0
 
@@ -455,6 +467,8 @@ if __name__ == '__main__':
 				Water = ww			# [kg/m^2]
 				snow = Snow			# [kg/m^2]
 				print('snow  :', snow, '[kg/m^2]')
+				sim().logf.write('plus:'+str(snow_plus)+'[kg/m^2],\t')
+				sim().logf.write('snow:'+str(snow)+'[kg/m^2],\t')
 				cover = Scover			# [m]
 				print('cover :', cover, '[m]')
 
@@ -469,10 +483,14 @@ if __name__ == '__main__':
 				print('snow.on :',Tsnow_on,'[min]\tsnow.off :',Tsnow_off,'[min]',\
 					'\nwet.on  :',Twet_on, '[min]\twet.off  :',Twet_off, '[min]',\
 					'\ndry.on  :',Tdry_on, '[min]\tdry.off  :',Tdry_off, '[min]')
-				if(heater==0):	print('heater : off')
-				else:			print('heater : on')
+				if(heater==0):
+					print('heater : off')
+					sim().logf.write('off\n')
+				else:
+					print('heater : on')
+					sim().logf.write('on\n')
 
-				time.sleep(1.5)
+#				time.sleep(1)
 
 
 		onT         = onT * interval			# [min]
