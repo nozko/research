@@ -11,7 +11,19 @@ import datetime
 import argparse
 import os
 
-import control_road
+import Q_control
+
+
+interval  = 5			# [min] calculatioin interval (10の約数)
+intervalN = int(10/interval)
+CK        = 1.0			# 緩和係数(0.7~1.5程度)
+maxT      = 70			# [℃ ] maximum temperature of heat source
+maxPene   = 0.05		# [m] maximum penetration height of water
+abrate0   = 0.2			# solar radiatioin absorption rate of snow(0.2)
+windC     = 0.5			# wind speed correction coefficient(~1)
+BT        = 8.0			# ? temperature
+C         = 0.052629437
+area      = 0.02783305
 
 
 class sim:
@@ -24,7 +36,7 @@ class sim:
 		
 		self.logf = open('simulate_log.txt', 'a')
 
-		self.control = control_road.control()
+		self.control = Q_control.control()
 
 
 	# absolute humidity
@@ -110,50 +122,21 @@ if __name__ == '__main__':
 	snow_minusT = 0
 	wet_minusT  = 0
 
+	print('interval :', interval, '[min]')
 
 	# initialize
 	temp_o = 0		# temperature outside
 	Qsup   = 0		# supplied Q
 	onT    = 0		# operating time
-	height = 0		# height of snow
-	slevel = 0		# level of snow accumulation
 	heater = 0		# on(1) / off(0)
-	irt    = 0
 	noPreT = 0		# no precipitation time
 	lpmx   = 0
 	ntime  = np.zeros((2, 3))
 	Qr     = 0		# Q from surface(snowing, more than 0℃ )
 
-
-	interval = 5		# [min] calculatioin interval (10の約数)
-	CK       = 1.0		# 緩和係数(0.7~1.5程度)
-	maxloop  = 100		# maximum number of loops(200)
-	print('interval :', interval, '[min]')
-
-	intervalN = int(10/interval)
-
 	smap4 = sim().run.readlines()[4].split('\t')
 	Qs      = float(smap4[0])	# [kcal/h] Q of heat source
-	maxT    = 70				# [℃ ] maximum temperature of heat source
-	timer   = float(smap4[5])	# delay time
-	circuit = int(smap4[7])		# number of rotatioin circuit
-
-	smap5 = sim().run.readlines()[5].split('\t')
-	snowT  = float(smap5[0])	# operating temperature during snowfall
-	wetT   = float(smap5[3])	# operating temperature with wet surface
-	dryT   = float(smap5[6])	# operating temperature with dry surface
-
-	remainW = 0.0		# [kg/m^2] remained water after melting
-	maxPene = 0.05		# [m] maximum penetration height of water
-	abrate0 = 0.2		# solar radiatioin absorption rate of snow(0.2)
-	windC   = 0.5		# wind speed correction coefficient(~1)
-	Scover0 = 0.0		# [m] initial snow cover (volume)
-	dens0   = 100		# [kg/m^3] initial snow density
-	# initial snow accumulation mass
-	snow0 = Scover0 * dens0		# [kg/m^2]
-
 	sim().run.close()
-
 
 	Qe    = 0
 	BF    = 0
@@ -163,15 +146,9 @@ if __name__ == '__main__':
 	htr   = 0
 	sat   = 0		# 相当外気温 Sol-Air Temperature
 
-	BT = 8.0		# ? temperature
-	C  = 0.052629437
-
-	area = 0.02783305
-	QQ  = 0.0
-
-	snow   = snow0		# [kg/m^2] snow mass
-	Scover = Scover0	# [m] snow volume
-	cover  = Scover0	# [m] snow volume
+	snow   = 0.0	# [kg/m^2] snow mass
+	Scover = 0.0	# [m] snow volume
+	cover  = 0.0	# [m] snow volume
 
 	net = re.split(" +", sim().net.readlines()[4])
 	npn = int(net[1])
@@ -179,9 +156,7 @@ if __name__ == '__main__':
 	for j in range(int(net[1])):
 		netj = re.split(" +", sim().net.readlines()[5+j])
 		HR.append(float(netj[3]))
-
 	sim().net.close()
-
 
 	data     = open(args.weather, 'r')
 	all_data = data.readlines()
@@ -279,7 +254,6 @@ if __name__ == '__main__':
 
 
 			E = 0
-			Q = 0
 			NC = 0
 			mlt = 0
 			ict = 0
@@ -290,6 +264,9 @@ if __name__ == '__main__':
 				Q = Qs
 				# sum of Q
 				erot = erot + Q*interval/60.0		# [kcal]
+			# when heater off
+			else:
+				Q = 0
 
 
 			# solar radiatioin absorption rate of snow
@@ -340,10 +317,11 @@ if __name__ == '__main__':
 				htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
 
 				# calc amount of snow melting
-#				melt = (200*TS + htrm*sat - 590*evaporate) \
-#						* (interval/60.0)/80.0
-				melt = (2*TS + htrm*sat- 590*evaporate) * (interval/60.0)/80.0
+				Hfusion = 80.0		# heat of fusion
+#				melt = (200*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
+				melt = (20*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
 				BF   = 1			# (?)
+				print('TS :', TS)
 
 				# 算出された融雪量が水分量より多い時
 				if(melt < -1*wat):
@@ -464,13 +442,14 @@ if __name__ == '__main__':
 				Qr_plus = BF*200*TS + (1-BF)*htr*(TS-sat)
 				Qr = Qr + (Qr_plus)*area
 
-			if( (Snow+pre)==0.0 and ww>remainW ):
-				ww = remainW		# [kg/m^2]
+			if( (Snow+pre)==0.0 and ww>0.0 ):
+				ww = 0.0		# [kg/m^2]
 			Water = ww			# [kg/m^2]
 			snow = Snow			# [kg/m^2]
 			print('snow  :', snow, '[kg/m^2]')
 			sim().logf.write('plus:'+str(snow_plus)+'[kg/m^2],\t')
 			sim().logf.write('snow:'+str(snow)+'[kg/m^2],\t')
+			sim().logf.write('melt:'+str(melt)+',\t')
 			cover = Scover			# [m]
 			print('cover :', cover, '[m]')
 
