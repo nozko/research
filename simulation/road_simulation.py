@@ -14,7 +14,7 @@ import os
 import Q_control
 
 
-interval  = 5			# [min] calculatioin interval (10の約数)
+interval  = 5			# [min] calculatioin interval
 intervalN = int(10/interval)
 CK        = 1.0			# 緩和係数(0.7~1.5程度)
 maxT      = 70			# [℃ ] maximum temperature of heat source
@@ -319,7 +319,7 @@ if __name__ == '__main__':
 				# calc amount of snow melting
 				Hfusion = 80.0		# heat of fusion
 #				melt = (200*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
-				melt = (20*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
+				melt = (3.7*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
 				BF   = 1			# (?)
 				print('TS :', TS)
 
@@ -471,7 +471,7 @@ if __name__ == '__main__':
 				print('heater : on')
 				sim().logf.write('on\n')
 
-#			time.sleep(1)
+			time.sleep(0.5)
 
 
 	onT         = onT * interval			# [min]
