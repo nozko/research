@@ -4,6 +4,7 @@
 from __future__ import print_function
 from datetime import datetime
 import argparse
+import sys
 
 import road_simulation
 
@@ -32,6 +33,7 @@ class control:
 
 
 class Qlearning:
+	# parameters
 	alpha = 0.1
 	gamma = 0.9
 
@@ -41,6 +43,21 @@ class Qlearning:
 		# rewards
 		self.r_on = -1
 		self.r_no = 100
+
+
+	def initializeQ(self, mode):
+		# only snow accumulation
+		if(mode==0):
+			Q = np.zeros(12)
+
+		# snow accumulation and temperature
+		elif(mode==1):
+			Q = np.zeros((12, 15))
+
+		# invalid mode
+		else:
+			print('invalid mode error!')
+			sys.exit()
 
 
 	def calcQ(self):

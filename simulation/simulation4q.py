@@ -11,7 +11,7 @@ import datetime
 import argparse
 import os
 
-import q_control
+import Q_control
 
 
 interval  = 5			# [min] calculatioin interval
@@ -35,7 +35,7 @@ class sim:
 		fn2 = 'smap.run'
 		self.run = open(fn2, 'r')
 		
-		self.logf = open('logs.txt', 'a')
+		self.logf = open('simulate_log.txt', 'a')
 
 		self.control = q_control.control()
 
@@ -112,13 +112,28 @@ class sim:
 
 
 
+class Qlearning:
+	
+	def __init__(self):
+		self.Qlearn = q_control.Qlearning()
+
+
+	def next_state(self, act):
+		if(act=='on'):
+
+
+		else:
+
+
+
+
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='weather data file')
 	parser.add_argument('weather')
 	args = parser.parse_args()
 
-	os.remove('logs.txt')
+	os.remove('simulate_log.txt')
 
 	snow_minusT = 0
 	wet_minusT  = 0
@@ -247,10 +262,12 @@ if __name__ == '__main__':
 						level = 2
 
 
-				# decide on/off
-#				heater = sim().control.judge_1(pre)
+				# Q learning
 				heater = sim().control.judge_2(snow)
-#				heater = sim().control.off()
+
+
+
+
 
 				ntime[heater][level] += 1
 
