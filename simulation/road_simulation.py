@@ -188,6 +188,7 @@ if __name__ == '__main__':
 		if(day != day_1):
 			day_cnt += 1
 			print('\n----- day', day_cnt, '-----')
+			sim().logf.write('\n----- day ' + str(day_cnt) + ' -----')
 			time.sleep(1)
 		day_1 = day
 
@@ -319,7 +320,7 @@ if __name__ == '__main__':
 				# calc amount of snow melting
 				Hfusion = 80.0		# heat of fusion
 #				melt = (200*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
-				melt = (3.7*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
+				melt = (3*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
 				BF   = 1			# (?)
 				print('TS :', TS)
 
@@ -471,7 +472,7 @@ if __name__ == '__main__':
 				print('heater : on')
 				sim().logf.write('on\n')
 
-			time.sleep(0.5)
+#			time.sleep(1)
 
 
 	onT         = onT * interval			# [min]
