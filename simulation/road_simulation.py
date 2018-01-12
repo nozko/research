@@ -95,7 +95,7 @@ class sim:
 
 
 	# penetration height
-	def penetration_height(self, cover, snow, Water, maxPene):
+	def penetration_height(self, cover, snow, Water):
 		peneH = 0
 		# when there is snow cover
 		if(cover > 0):
@@ -154,7 +154,7 @@ if __name__ == '__main__':
 	net = re.split(" +", sim().net.readlines()[4])
 	npn = int(net[1])
 	HR = []
-	for j in range(int(net[1])):
+	for j in range(npn):
 		netj = re.split(" +", sim().net.readlines()[5+j])
 		HR.append(float(netj[3]))
 	sim().net.close()
@@ -280,23 +280,23 @@ if __name__ == '__main__':
 			sat = temp_o + (abrate*sun-0.9*nightR)/(sim().funa(Wspeed)+4)
 
 
+			# total water
+			wat = Water + rain_plus		# [kg/m^2]
+
+
 			TS  = BT			# temperature(?)
 			# 路面に雪があるとき
 			if( (snow+snow_plus)>0 ):
 				if( TS>0 or sat>0 ):
 					mlt = 1
 			# 路面に水があるとき
-			if( (Water+rain_plus)>0 ):
+			if(wat > 0):
 				if( TS<0 ):
 					mlt = 1
 
 
 			# penetration height [m]
-			peneH = sim().penetration_height(cover, snow, Water, maxPene)
-
-
-			# total water
-			wat = Water + rain_plus		# [kg/m^2]
+			peneH = sim().penetration_height(cover, snow, Water)
 
 
 			melt  = 0

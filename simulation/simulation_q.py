@@ -10,8 +10,9 @@ import time
 import datetime
 import argparse
 import os
+import linecache
 
-import Q_control
+import q_control
 
 
 interval  = 5			# [min] calculatioin interval
@@ -26,16 +27,29 @@ C         = 0.052629437
 area      = 0.02783305
 Hfusion   = 80.0		# heat of fusion
 
+fn1 = open('smap.run', 'r')
+smap4 = fn1.readlines()[4].split('\t')
+Qs    = float(smap4[0])		# [kcal/h] Q of heat source
+fn1.close()
+
+fn2 = open('file.net', 'r')
+net = re.split(" +", fn2.readlines()[4])
+npn = int(net[1])
+HR = []
+for j in range(npn):
+	target_line = linecache.getline('file.net', 6+j)
+	netj = re.split( " +", target_line)
+	HR.append(float(netj[3]))
+fn2.close()
+linecache.clearcache()
+
 
 class sim:
 
 	def __init__(self):
 		fn1 = 'file.net'
 		self.net = open(fn1, 'r')
-		fn2 = 'smap.run'
-		self.run = open(fn2, 'r')
-		
-		self.logf = open('simulate_log.txt', 'a')
+		self.logf = open('q_logs.txt', 'a')
 
 		self.control = q_control.control()
 
@@ -95,7 +109,7 @@ class sim:
 
 
 	# penetration height
-	def penetration_height(self, cover, snow, Water, maxPene):
+	def penetration_height(self, cover, snow, Water):
 		peneH = 0
 		# when there is snow cover
 		if(cover > 0):
@@ -118,12 +132,212 @@ class Qlearning:
 		self.Qlearn = q_control.Qlearning()
 
 
-	def next_state(self, act):
-		if(act=='on'):
+	def next_Tlevel(self, all_data, intN, m):
+		if(intN == intervalN-1):
+			nextTemp = float(all_data[m+2].split(', ')[5])
+		else:
+			nextTemp = float(all_data[m+1].split(', ')[5])
 
+		if(nextTemp < -10):
+			Tlevel = 0
+		elif(nextTemp < -8):
+			Tlevel = 1
+		elif(nextTemp < -6):
+			Tlevel = 2
+		elif(nextTemp < -4):
+			Tlevel = 3
+		elif(nextTemp < -3):
+			Tlevel = 4
+		elif(nextTemp < -2):
+			Tlevel = 5
+		elif(nextTemp < -1):
+			Tlevel = 6
+		elif(nextTemp < 0):
+			Tlevel = 7
+		elif(nextTemp < 1):
+			Tlevel = 8
+		elif(nextTemp < 2):
+			Tlevel = 9
+		elif(nextTemp < 3):
+			Tlevel = 10
+		elif(nextTemp < 4):
+			Tlevel = 11
+		elif(nextTemp < 6):
+			Tlevel = 12
+		elif(nextTemp < 8):
+			Tlevel = 13
+		else:
+			Tlevel = 14
+
+		return Tlevel
+
+
+	def next_Slevel(self, act, cover, temp_o, nightR, Wspeed, Water, \
+					rain_plus, snow, snow_plus, sfdens, tset, ilp, Qr):
+		ict = 0
+		E   = 0
+
+		abrate = 0.8 - 30*cover
+		if(abrate < abrate0):	abrate = abrate0
+
+		sat = temp_o + (abrate*sun-0.9*nightR)/(sim().funa(Wspeed)+4)
+
+		# total water
+		wat = Water + rain_plus
+
+		mlt = 0
+		TS = BT
+		# 路面に雪があるとき
+		if( (snow+snow_plus)>0 ):
+			if( TS>0 or sat>0 ):
+				mlt = 1
+		# 路面に水があるとき
+		if(wat > 0):
+			if(TS < 0):
+				mlt = 1
+
+		# penetration height [m]
+		peneH = sim().penetration_height(cover, snow, Water)
+
+		if(act=='on'):
+			Q = Qs
+		else:
+			Q = 0
+
+		melt = 0
+		evaporate = 0
+		BF = 0
+		if(mlt==1):
+			DH = cover - peneH
+			if(DH<=0 or sat>0):
+				DH  = 0
+				tsv = 0
+				# evaporation amount
+				evaporate = 4 * sim().funa(Wspeed) * (sim().abshumid(tsv)-absH)
+				# total water [kg/m^2]
+				wat = Water + rain_plus - evaporate*(interval/60.0)
+				# abnormal value correction
+				if(wat < 0):
+					evaporate = Water/(interval/60.0) + rain_plus
+					wat = 0
+			htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
+
+			# calc amount of snow melting
+			melt = (200*TS + htrm*sat - 590*evaporate) \
+						* (interval/60.0) / (Hfusion*100)
+
+			BF = 1
+
+			if(melt < -1*wat):
+				melt = -1 * wat
+			elif( melt > (snow+snow_plus) ):
+				melt = snow + snow_plus
+			if(melt < 0):
+				melt = 0
 
 		else:
+			tsv = BT
+			evaporate = 4 * sim().funa(Wspeed) * (sim().abshumid(tsv) - absH)
+			if( evaporate > (Water/(interval/60.0) + rain_plus) ):
+				evaporate = Water/(interval/60.0) + rain_plus
 
+		htr  = 1 / (1/(sim().funa(Wspeed)+4) + cover/0.08)
+		Qe   = -590*evaporate*(interval/60.0) * area * (1-BF)
+		Snow = snow - melt + snow_plus
+
+		# snow accumulation [m]
+		if(Snow > 0):
+			if(melt > 0):
+				Scover = cover + snow_plus/sfdens - melt/916
+			else:
+				Scover = cover + snow_plus/sfdens
+		else:
+			Scover = 0
+
+		T = BT
+
+		while(True):
+			if(ict==1):
+				T = tset
+				E = 0
+			S1 = (Q+Qe+E)*(interval/60.0) + BT*C
+			S2 = C
+
+			for j in range(npn):
+				S1 += HR[j] * T * (interval/60.0)
+				S2 += HR[j] * (interval/60.0)
+
+			tmp = (1-BF) * htr * sat
+			S1 += tmp * (interval/60.0) * area
+			S2 += (BF*200 + (1-BF)*htr) * (interval/60.0) * area
+			if(ict==1):
+				E = (S2*tset - S1) / (interval/60.0)
+			else:
+				ER = S1/S2 - T
+				T = CK*ER + T
+
+			if(ilp < 2):
+				if( T>maxT and Q>0 ):
+					ilp += 1
+					tset = maxT
+					ict = 1
+					Q = 0
+					continue
+				if(E < 0):
+					ilp += 1
+					ict = 0
+					E = 0
+					continue
+				else:	break
+			else:	break
+
+		# abnormal valu correction
+		if(Snow < 0):
+			Snow = 0
+
+		if( Scover>0 and Snow>0 ):
+			gm = Snow / Scover
+			ee = 16 * math.exp(0.021*gm)
+			gm *= math.exp( Snow/2/ee*(interval/60.0)/24 )
+			if(gm > 916):	gm = 916
+			Scover = Snow / gm
+
+
+		if( pre>0.0 and T>0 ):
+			TS = T
+			Qr_plus = BF*200*TS + (1-BF)*htr*(TS-sat)
+			Qr += Qr_plus * area
+
+		snow = Snow
+
+		# snow accumulation level
+		if( snow < 0 ):
+			print('invalid value of snow accumulation')
+			sys.exit()
+		elif( snow < 0.01 ):
+			Slevel = 0
+		elif( snow < 0.02 ):
+			Slevel = 1
+		elif( snow < 0.03 ):
+			Slevel = 2
+		elif( snow < 0.04 ):
+			Slevel = 3
+		elif( snow < 0.05 ):
+			Slevel = 4
+		elif( snow < 0.06 ):
+			Slevel = 5
+		elif( snow < 0.08 ):
+			Slevel = 6
+		elif( snow < 0.1 ):
+			Slevel = 7
+		elif( snow < 0.15 ):
+			Slevel = 8
+		elif( snow < 0.2 ):
+			Slevel = 9
+		else:
+			Slevel = 10
+
+		return Slevel
 
 
 
@@ -133,7 +347,7 @@ if __name__ == '__main__':
 	parser.add_argument('weather')
 	args = parser.parse_args()
 
-	os.remove('simulate_log.txt')
+	os.remove('q_logs.txt')
 
 	snow_minusT = 0
 	wet_minusT  = 0
@@ -149,11 +363,6 @@ if __name__ == '__main__':
 	lpmx   = 0
 	ntime  = np.zeros((2, 3))
 	Qr     = 0		# Q from surface(snowing, more than 0℃ )
-
-	smap4 = sim().run.readlines()[4].split('\t')
-	Qs      = float(smap4[0])	# [kcal/h] Q of heat source
-	sim().run.close()
-
 	Qe    = 0
 	BF    = 0
 	Water = 0		# [kg/m^2]
@@ -166,13 +375,7 @@ if __name__ == '__main__':
 	Scover = 0.0	# [m] snow volume
 	cover  = 0.0	# [m] snow volume
 
-	net = re.split(" +", sim().net.readlines()[4])
-	npn = int(net[1])
-	HR = []
-	for j in range(int(net[1])):
-		netj = re.split(" +", sim().net.readlines()[5+j])
-		HR.append(float(netj[3]))
-	sim().net.close()
+	tset = 0
 
 	data     = open(args.weather, 'r')
 	all_data = data.readlines()
@@ -205,7 +408,7 @@ if __name__ == '__main__':
 			day_cnt += 1
 			print('\n----- day', day_cnt, '-----')
 			sim().logf.write('\n----- day ' + str(day_cnt) + ' -----')
-#			time.sleep(1)
+			time.sleep(1)
 		day_1 = day
 
 		sun = sun/4.186*1000		# [kcal/m^2]
@@ -262,14 +465,16 @@ if __name__ == '__main__':
 						level = 2
 
 
-				# Q learning
-				heater = sim().control.judge_2(snow)
+			# Q learning
+			heater = sim().control.judge_2(snow)
+			Slevel = Qlearning().next_Slevel('on', cover, temp_o, nightR, \
+											Wspeed, Water, rain_plus, snow, \
+											snow_plus, sfdens, tset, ilp, Qr)
+			print('next Slevel :', Slevel)
+			sim().logf.write('next Slevel:'+str(Slevel)+',\t')
 
 
-
-
-
-				ntime[heater][level] += 1
+			ntime[heater][level] += 1
 
 
 			E = 0
@@ -309,7 +514,7 @@ if __name__ == '__main__':
 
 
 			# penetration height [m]
-			peneH = sim().penetration_height(cover, snow, Water, maxPene)
+			peneH = sim().penetration_height(cover, snow, Water)
 
 
 			# total water
@@ -404,7 +609,6 @@ if __name__ == '__main__':
 					aer = abs(ER)
 					if(aer > erx):
 						erx = aer
-						ier = 0
 					T = CK*ER + T
 
 				if(erx > 0.0001):
@@ -468,7 +672,6 @@ if __name__ == '__main__':
 			print('snow  :', snow, '[kg/m^2]')
 			sim().logf.write('plus:'+str(snow_plus)+'[kg/m^2],\t')
 			sim().logf.write('snow:'+str(snow)+'[kg/m^2],\t')
-			sim().logf.write('melt:'+str(melt)+',\t')
 			cover = Scover			# [m]
 			print('cover :', cover, '[m]')
 
@@ -490,7 +693,7 @@ if __name__ == '__main__':
 				print('heater : on')
 				sim().logf.write('on\n')
 
-#			time.sleep(1)
+			time.sleep(1)
 
 
 	onT         = onT * interval			# [min]

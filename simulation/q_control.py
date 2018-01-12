@@ -48,11 +48,11 @@ class Qlearning:
 	def initializeQ(self, mode):
 		# only snow accumulation
 		if(mode==0):
-			Q = np.zeros(12)
+			Q = np.zeros(11)
 
 		# snow accumulation and temperature
 		elif(mode==1):
-			Q = np.zeros((12, 15))
+			Q = np.zeros((11, 15))
 
 		# invalid mode
 		else:
