@@ -463,9 +463,6 @@ if __name__ == '__main__':
 			Twet_on   = ntime[1][1] * interval
 			Tdry_off  = ntime[0][2] * interval
 			Tdry_on   = ntime[1][2] * interval
-			print('snow.on :',Tsnow_on,'[min]\tsnow.off :',Tsnow_off,'[min]',\
-				'\nwet.on  :',Twet_on, '[min]\twet.off  :',Twet_off, '[min]',\
-				'\ndry.on  :',Tdry_on, '[min]\tdry.off  :',Tdry_off, '[min]')
 			if(heater==0):
 				print('heater : off')
 				sim().logf.write('off\n')
@@ -488,6 +485,3 @@ if __name__ == '__main__':
 	Twet_on   = ntime[1][1] * interval
 	Tdry_off  = ntime[0][2] * interval
 	Tdry_on   = ntime[1][2] * interval
-	print('\nsnow.on :',Tsnow_on,'[min]\tsnow.off :',Tsnow_off,'[min]',\
-		  '\nwet.on  :',Twet_on, '[min]\twet.off  :',Twet_off, '[min]',\
-		  '\ndry.on  :',Tdry_on, '[min]\tdry.off  :',Tdry_off, '[min]')

@@ -10,9 +10,15 @@ import time
 import datetime
 import argparse
 import os
+import os.path
 import linecache
 
 import q_control
+
+
+MODE = 1
+# MODE:0 -> only snow accumulation
+# MODE:1 -> snow accumulation and temperature
 
 
 interval  = 5			# [min] calculatioin interval
@@ -47,8 +53,7 @@ linecache.clearcache()
 class sim:
 
 	def __init__(self):
-		fn1 = 'file.net'
-		self.net = open(fn1, 'r')
+		self.net = open('file.net', 'r')
 		self.logf = open('q_logs.txt', 'a')
 
 		self.control = q_control.control()
@@ -126,10 +131,12 @@ class sim:
 
 
 
-class Qlearning:
+class QL:
 	
 	def __init__(self):
-		self.Qlearn = q_control.Qlearning()
+		alpha = 0.1
+		gamma = 0.99
+		self.Qlearn = q_control.Qlearning(MODE, alpha, gamma, interval)
 
 
 	def next_Tlevel(self, all_data, intN, m):
@@ -137,39 +144,9 @@ class Qlearning:
 			nextTemp = float(all_data[m+2].split(', ')[5])
 		else:
 			nextTemp = float(all_data[m+1].split(', ')[5])
-
-		if(nextTemp < -10):
-			Tlevel = 0
-		elif(nextTemp < -8):
-			Tlevel = 1
-		elif(nextTemp < -6):
-			Tlevel = 2
-		elif(nextTemp < -4):
-			Tlevel = 3
-		elif(nextTemp < -3):
-			Tlevel = 4
-		elif(nextTemp < -2):
-			Tlevel = 5
-		elif(nextTemp < -1):
-			Tlevel = 6
-		elif(nextTemp < 0):
-			Tlevel = 7
-		elif(nextTemp < 1):
-			Tlevel = 8
-		elif(nextTemp < 2):
-			Tlevel = 9
-		elif(nextTemp < 3):
-			Tlevel = 10
-		elif(nextTemp < 4):
-			Tlevel = 11
-		elif(nextTemp < 6):
-			Tlevel = 12
-		elif(nextTemp < 8):
-			Tlevel = 13
-		else:
-			Tlevel = 14
-
-		return Tlevel
+			
+		nextTLv = self.Qlearn.Tlevel(nextTemp)
+		return nextTLv
 
 
 	def next_Slevel(self, act, cover, temp_o, nightR, Wspeed, Water, \
@@ -199,7 +176,7 @@ class Qlearning:
 		# penetration height [m]
 		peneH = sim().penetration_height(cover, snow, Water)
 
-		if(act=='on'):
+		if(act==1):
 			Q = Qs
 		else:
 			Q = 0
@@ -224,7 +201,7 @@ class Qlearning:
 
 			# calc amount of snow melting
 			melt = (200*TS + htrm*sat - 590*evaporate) \
-						* (interval/60.0) / (Hfusion*100)
+						* (interval/60.0) / (Hfusion*150)
 
 			BF = 1
 
@@ -310,34 +287,8 @@ class Qlearning:
 
 		snow = Snow
 
-		# snow accumulation level
-		if( snow < 0 ):
-			print('invalid value of snow accumulation')
-			sys.exit()
-		elif( snow < 0.01 ):
-			Slevel = 0
-		elif( snow < 0.02 ):
-			Slevel = 1
-		elif( snow < 0.03 ):
-			Slevel = 2
-		elif( snow < 0.04 ):
-			Slevel = 3
-		elif( snow < 0.05 ):
-			Slevel = 4
-		elif( snow < 0.06 ):
-			Slevel = 5
-		elif( snow < 0.08 ):
-			Slevel = 6
-		elif( snow < 0.1 ):
-			Slevel = 7
-		elif( snow < 0.15 ):
-			Slevel = 8
-		elif( snow < 0.2 ):
-			Slevel = 9
-		else:
-			Slevel = 10
-
-		return Slevel
+		nextSLv = self.Qlearn.Slevel(snow)
+		return nextSLv
 
 
 
@@ -347,7 +298,8 @@ if __name__ == '__main__':
 	parser.add_argument('weather')
 	args = parser.parse_args()
 
-	os.remove('q_logs.txt')
+	if(os.path.exists('q_logs.txt')):
+		os.remove('q_logs.txt')
 
 	snow_minusT = 0
 	wet_minusT  = 0
@@ -383,10 +335,12 @@ if __name__ == '__main__':
 	day_cnt  = 0
 	day_1    = 0
 
+	# initialize Q table
+	Qtable, comp = QL().Qlearn.initializeQ()
 
 
 	### 10 minutes loop ###
-	for m in range(data_num):
+	for m in range(data_num-1):
 		t0 = temp_o
 		data1 = all_data[ m+1 ].split(', ')
 		month   = int(data1[1])
@@ -465,20 +419,39 @@ if __name__ == '__main__':
 						level = 2
 
 
-			# Q learning
-			heater = sim().control.judge_2(snow)
-			Slevel = Qlearning().next_Slevel('on', cover, temp_o, nightR, \
-											Wspeed, Water, rain_plus, snow, \
-											snow_plus, sfdens, tset, ilp, Qr)
-			print('next Slevel :', Slevel)
-			sim().logf.write('next Slevel:'+str(Slevel)+',\t')
+			""" Q learning """
+			# levels
+			Slevel = QL().Qlearn.Slevel(snow)
+			onSLv  = QL().next_Slevel(1, cover, temp_o, nightR, \
+										Wspeed, Water, rain_plus, snow, \
+										snow_plus, sfdens, tset, ilp, Qr)
+			offSLv = QL().next_Slevel(0, cover, temp_o, nightR, \
+										Wspeed, Water, rain_plus, snow, \
+										snow_plus, sfdens, tset, ilp, Qr)
+			if(MODE>=1):
+				Tlevel = QL().Qlearn.Tlevel(temp_o)
+				nextTLv = QL().next_Tlevel(all_data, intN, m)
+				if(MODE>=2):
+					pass
+
+			# decide action
+			if( MODE==0 ):
+				heater = QL().Qlearn.select_act0(Qtable, Slevel, onSLv, offSLv)
+			elif( MODE==1 ):
+				heater = QL().Qlearn.select_act1(Qtable, Slevel, onSLv, offSLv, nextTLv)
+
+			# update Q table
+			if(MODE==0):
+				Qtable, comp = QL().Qlearn.update_Q0(Qtable, comp, heater, Slevel, onSLv, offSLv)
+			elif(MODE==1):
+				Qtable, comp = QL().Qlearn.update_Q1(Qtable, comp, heater, Slevel, Tlevel, onSLv, offSLv, nextTLv)
 
 
 			ntime[heater][level] += 1
 
 
-			E = 0
-			NC = 0
+			E   = 0
+			NC  = 0
 			mlt = 0
 			ict = 0
 
@@ -541,11 +514,9 @@ if __name__ == '__main__':
 				htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
 
 				# calc amount of snow melting
-#				melt = (200*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
 				melt = (200*TS+htrm*sat-590*evaporate) \
 							* (interval/60.0)/(Hfusion*180)
 				BF   = 1			# (?)
-				print('TS :', TS)
 
 				# 算出された融雪量が水分量より多い時
 				if(melt < -1*wat):
@@ -573,11 +544,8 @@ if __name__ == '__main__':
 			# snow accumulation (volume) [m]
 			if(Snow > 0):
 				if(melt > 0):
-#					Scover = Snow / (snow + snow_plus) \
-#								/ (cover + snow_plus/sfdens)
 					Scover = cover + snow_plus/sfdens - melt/916
 				else:
-#					Scover = cover + snow_plus/sfdens - melt/916
 					Scover = cover + snow_plus/sfdens
 			else:
 				Scover = 0
@@ -668,7 +636,7 @@ if __name__ == '__main__':
 			if( (Snow+pre)==0.0 and ww>0.0 ):
 				ww = 0.0		# [kg/m^2]
 			Water = ww			# [kg/m^2]
-			snow = Snow			# [kg/m^2]
+			snow  = Snow		# [kg/m^2]
 			print('snow  :', snow, '[kg/m^2]')
 			sim().logf.write('plus:'+str(snow_plus)+'[kg/m^2],\t')
 			sim().logf.write('snow:'+str(snow)+'[kg/m^2],\t')
@@ -683,9 +651,6 @@ if __name__ == '__main__':
 			Twet_on   = ntime[1][1] * interval
 			Tdry_off  = ntime[0][2] * interval
 			Tdry_on   = ntime[1][2] * interval
-			print('snow.on :',Tsnow_on,'[min]\tsnow.off :',Tsnow_off,'[min]',\
-				'\nwet.on  :',Twet_on, '[min]\twet.off  :',Twet_off, '[min]',\
-				'\ndry.on  :',Tdry_on, '[min]\tdry.off  :',Tdry_off, '[min]')
 			if(heater==0):
 				print('heater : off')
 				sim().logf.write('off\n')
@@ -693,7 +658,7 @@ if __name__ == '__main__':
 				print('heater : on')
 				sim().logf.write('on\n')
 
-			time.sleep(1)
+			time.sleep(0.3)
 
 
 	onT         = onT * interval			# [min]
@@ -708,6 +673,3 @@ if __name__ == '__main__':
 	Twet_on   = ntime[1][1] * interval
 	Tdry_off  = ntime[0][2] * interval
 	Tdry_on   = ntime[1][2] * interval
-	print('\nsnow.on :',Tsnow_on,'[min]\tsnow.off :',Tsnow_off,'[min]',\
-		  '\nwet.on  :',Twet_on, '[min]\twet.off  :',Twet_off, '[min]',\
-		  '\ndry.on  :',Tdry_on, '[min]\tdry.off  :',Tdry_off, '[min]')
