@@ -14,7 +14,7 @@ import os
 import q_control
 
 
-interval  = 5			# [min] calculatioin interval
+interval  = 0.5			# [min] calculatioin interval
 intervalN = int(10/interval)
 CK        = 1.0			# 緩和係数(0.7~1.5程度)
 maxT      = 70			# [℃ ] maximum temperature of heat source
@@ -30,12 +30,9 @@ Hfusion   = 80.0		# heat of fusion
 class sim:
 
 	def __init__(self):
-		fn1 = 'file.net'
-		self.net = open(fn1, 'r')
-		fn2 = 'smap.run'
-		self.run = open(fn2, 'r')
-		
-		self.logf = open('logs.txt', 'a')
+		self.net = open('file.net', 'r')
+		self.run = open('smap.run', 'r')
+		self.logf = open('logs_'+str(interval)+'.csv', 'a')
 
 		self.control = q_control.control()
 
@@ -118,7 +115,8 @@ if __name__ == '__main__':
 	parser.add_argument('weather')
 	args = parser.parse_args()
 
-	os.remove('logs.txt')
+	os.remove('logs_'+str(interval)+'.csv')
+	sim().logf.write('date, temperature, precipitation, snow accumulate, switch')
 
 	snow_minusT = 0
 	wet_minusT  = 0
@@ -189,7 +187,7 @@ if __name__ == '__main__':
 		if(day != day_1):
 			day_cnt += 1
 			print('\n----- day', day_cnt, '-----')
-			sim().logf.write('\n----- day ' + str(day_cnt) + ' -----')
+			sim().logf.write('\n----- day ' + str(day_cnt) + ' -----\n')
 #			time.sleep(1)
 		day_1 = day
 
@@ -197,9 +195,6 @@ if __name__ == '__main__':
 
 		date = '2017-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
 		date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
-
-		sim().logf.write(str(date) + '\n')
-
 
 		# absolute humidity, night R
 		absH, nightR = sim().absoluteHumid(vaporP, cloud, temp_o, nightR)
@@ -209,6 +204,7 @@ if __name__ == '__main__':
 		for intN in range(intervalN):
 			date = date + datetime.timedelta(minutes=interval)
 			print('\n', date)
+			sim().logf.write(str(date) + ', ')
 
 			Wspeed = Wspeed0 * windC		# [m/sec] after ccorrection
 
@@ -449,13 +445,14 @@ if __name__ == '__main__':
 			Water = ww			# [kg/m^2]
 			snow = Snow			# [kg/m^2]
 			print('snow  :', snow, '[kg/m^2]')
-			sim().logf.write('plus:'+str(snow_plus)+'[kg/m^2],\t')
-			sim().logf.write('snow:'+str(snow)+'[kg/m^2],\t')
-			sim().logf.write('melt:'+str(melt)+',\t')
 			cover = Scover			# [m]
 			print('cover :', cover, '[m]')
 
 			BT = T
+
+			sim().logf.write(str(temp_o)+', ')
+			sim().logf.write(str(pre)+', ')
+			sim().logf.write(str(snow)+', ')
 
 			Tsnow_off = ntime[0][0] * interval
 			Tsnow_on  = ntime[1][0] * interval

@@ -201,7 +201,7 @@ class QL:
 
 			# calc amount of snow melting
 			melt = (200*TS + htrm*sat - 590*evaporate) \
-						* (interval/60.0) / (Hfusion*150)
+						* (interval/60.0) / (Hfusion*180)
 
 			BF = 1
 
