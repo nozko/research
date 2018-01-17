@@ -47,13 +47,16 @@ class Qlearning:
 		self.gamma = gamma
 
 		# rewards
-		self.r_on   = -1 #* interval
+		self.r_on   = -1 * interval
 		self.r_off  = 0 * interval
-		self.r_comp = 100
+		self.r_comp = 1000
 
 		# epsilon-greedy
 		self.epsilon = 0.1
 		self.normal  = 0.2
+
+		# log
+		self.logf = open('q_logs.txt', 'a')
 
 
 	def initializeQ(self):
@@ -187,37 +190,44 @@ class Qlearning:
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
 			if( Q[1][onSLv] > Q[0][offSLv] ):
-				return 1
+				act = 1
 			elif( Q[1][onSLv] == Q[0][offSLv] ):
 				print('same next Q -> random choice')
-				return random.choice(action)
+				self.logf.write('rnadom, ')
+				act = random.choice(action)
 			else:
-				return 0
+				act = 0
 		elif( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
 			if(Slevel<=4):
-				return 0
+				act = 0
 			else:
-				return 1	
+				act = 1	
 		else:
 			print('random choice (epsilon-greedy)')
-			return random.choice(action)
+			self.logf.write('rnadom, ')
+			act = random.choice(action)
+		self.logf.write(str(act)+'\n')
+		return act
 
 
 	def select_act1(self, Q, Slevel, onSLv, offSLv, nextTLv):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
 			if( Q[1][onSLv][nextTLv] > Q[0][offSLv][nextTLv] ):
-				return 1
+				act = 1
 			elif( Q[1][onSLv][nextTLv] == Q[0][offSLv][nextTLv] ):
 				print('same next Q -> random choice')
-				return random.choice(action)
+				self.logf.write('rnadom, ')
+				act = random.choice(action)
 			else:
-				return 0
+				act = 0
 		elif( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
 			if(Slevel<=4):
-				return 0
+				act = 0
 			else:
-				return 1	
+				act = 1	
 		else:
 			print('random choice')
-			return random.choice(action)
+			self.logf.write('rnadom, ')
+			act = random.choice(action)
+		return act
