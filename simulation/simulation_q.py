@@ -16,12 +16,12 @@ import linecache
 import q_control
 
 
-MODE = 1
+MODE = 0
 # MODE:0 -> only snow accumulation
 # MODE:1 -> snow accumulation and temperature
 
 
-interval  = 5			# [min] calculatioin interval
+interval  = 2			# [min] calculatioin interval
 intervalN = int(10/interval)
 CK        = 1.0			# 緩和係数(0.7~1.5程度)
 maxT      = 70			# [℃ ] maximum temperature of heat source
@@ -134,7 +134,7 @@ class sim:
 class QL:
 	
 	def __init__(self):
-		alpha = 0.1
+		alpha = 0.3
 		gamma = 0.99
 		self.Qlearn = q_control.Qlearning(MODE, alpha, gamma, interval)
 
@@ -364,7 +364,7 @@ if __name__ == '__main__':
 				day_cnt += 1
 				print('\n----- day', day_cnt, '-----')
 				sim().logf.write('\n----- day ' + str(day_cnt) + ' -----\n')
-				time.sleep(1)
+				time.sleep(0.5)
 			day_1 = day
 
 			sun = sun/4.186*1000		# [kcal/m^2]
@@ -659,7 +659,7 @@ if __name__ == '__main__':
 					print('heater : on')
 					sim().logf.write('on\n')
 
-				time.sleep(0.3)
+#				time.sleep(0.3)
 
 
 	finally:

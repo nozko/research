@@ -47,7 +47,7 @@ class Qlearning:
 		self.gamma = gamma
 
 		# rewards
-		self.r_on   = -1 * interval
+		self.r_on   = -1 * interval/100
 		self.r_off  = 0 * interval
 		self.r_comp = 1000
 
@@ -66,9 +66,6 @@ class Qlearning:
 
 		# snow accumulation and temperature Q[Slevel, Tlevel]
 		elif(self.MODE==1):
-			_act  = [0, 0]
-			_temp = [_act for i in range(15)]
-			Qtable = [_temp for j in range(11)]
 			Qtable = np.zeros(((2, 11, 15)))
 
 		# invalid MODE
@@ -160,7 +157,6 @@ class Qlearning:
 			nextMax = self.nextMax0(Q, 0, offSLv)
 			Q[0][Slevel] = (1-self.alpha) * Q[0][Slevel] \
 							+ self.alpha * (reward + self.gamma*nextMax)
-		print(Q)
 		return Q, comp
 
 
@@ -181,7 +177,6 @@ class Qlearning:
 			nextMax = self.nextMax1(Q, 0, offSLv, nextTLv)
 			Q[0][Slevel][Tlevel] = (1-self.alpha) * Q[0][Slevel][Tlevel] \
 							+ self.alpha * (reward + self.gamma*nextMax)
-		print(Q)
 		return Q, comp
 
 
