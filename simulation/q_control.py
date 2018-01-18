@@ -49,7 +49,7 @@ class Qlearning:
 		# rewards
 		self.r_on   = -1 * interval/100
 		self.r_off  = 0 * interval
-		self.r_comp = 1000
+		self.r_comp = 10000
 
 		# epsilon-greedy
 		self.epsilon = 0.1
@@ -60,13 +60,13 @@ class Qlearning:
 
 
 	def initializeQ(self):
-		# only snow accumulation Q[Slevel]
+		# only snow accumulation Q[action][Slevel]
 		if(self.MODE==0):
-			Qtable = np.zeros((2, 11))
+			Qtable = np.zeros((2, 10))
 
-		# snow accumulation and temperature Q[Slevel, Tlevel]
+		# snow accumulation and temperature Q[action][Slevel, Tlevel]
 		elif(self.MODE==1):
-			Qtable = np.zeros(((2, 11, 15)))
+			Qtable = np.zeros(((2, 10, 13)))
 
 		# invalid MODE
 		else:
@@ -78,21 +78,19 @@ class Qlearning:
 
 
 	def Tlevel(self, temp):
-		if( temp < -10 ):	Tlevel = 0
-		elif( temp < -8 ):	Tlevel = 1
-		elif( temp < -6 ):	Tlevel = 2
-		elif( temp < -4 ):	Tlevel = 3
-		elif( temp < -3 ):	Tlevel = 4
-		elif( temp < -2 ):	Tlevel = 5
-		elif( temp < -1 ):	Tlevel = 6
-		elif( temp < 0 ):	Tlevel = 7
-		elif( temp < 1 ):	Tlevel = 8
-		elif( temp < 2 ):	Tlevel = 9
-		elif( temp < 3 ):	Tlevel = 10
-		elif( temp < 4 ):	Tlevel = 11
-		elif( temp < 6 ):	Tlevel = 12
-		elif( temp < 8 ):	Tlevel = 13
-		else:				Tlevel = 14
+		if( temp < -8 ):	Tlevel = 0
+		elif( temp < -6 ):	Tlevel = 1
+		elif( temp < -4 ):	Tlevel = 2
+		elif( temp < -3 ):	Tlevel = 3
+		elif( temp < -2 ):	Tlevel = 4
+		elif( temp < -1 ):	Tlevel = 5
+		elif( temp < 0 ):	Tlevel = 6
+		elif( temp < 1 ):	Tlevel = 7
+		elif( temp < 2 ):	Tlevel = 8
+		elif( temp < 3 ):	Tlevel = 9
+		elif( temp < 4 ):	Tlevel = 10
+		elif( temp < 6 ):	Tlevel = 11
+		else:				Tlevel = 12
 		return Tlevel
 
 
@@ -105,12 +103,11 @@ class Qlearning:
 		elif( snow < 0.03 ):	Slevel = 2
 		elif( snow < 0.04 ):	Slevel = 3
 		elif( snow < 0.05 ):	Slevel = 4
-		elif( snow < 0.06 ):	Slevel = 5
-		elif( snow < 0.08 ):	Slevel = 6
-		elif( snow < 0.1 ) :	Slevel = 7
-		elif( snow < 0.15 ):	Slevel = 8
-		elif( snow < 0.2 ) :	Slevel = 9
-		else:					Slevel = 10
+		elif( snow < 0.07 ):	Slevel = 5
+		elif( snow < 0.1 ) :	Slevel = 6
+		elif( snow < 0.15 ):	Slevel = 7
+		elif( snow < 0.2 ) :	Slevel = 8
+		else:					Slevel = 9
 		return Slevel
 
 
@@ -172,11 +169,11 @@ class Qlearning:
 			reward += self.r_on
 			nextMax = self.nextMax1(Q, 1, onSLv, nextTLv)
 			Q[1][Slevel][Tlevel] = (1-self.alpha) * Q[1][Slevel][Tlevel] \
-							+ self.alpha * (reward + self.gamma*nextMax)
+								+ self.alpha * (reward + self.gamma*nextMax)
 		else:
 			nextMax = self.nextMax1(Q, 0, offSLv, nextTLv)
 			Q[0][Slevel][Tlevel] = (1-self.alpha) * Q[0][Slevel][Tlevel] \
-							+ self.alpha * (reward + self.gamma*nextMax)
+								+ self.alpha * (reward + self.gamma*nextMax)
 		return Q, comp
 
 
