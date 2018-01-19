@@ -53,10 +53,10 @@ class Qlearning:
 
 		# epsilon-greedy
 		self.epsilon = 0.2
-		self.normal  = 0.1
+		self.normal  = 0.0
 
 		# log
-		self.logf = open('q_logs.txt', 'a')
+		self.logf = open('q_logs_'+str(MODE)+'.txt', 'a')
 
 
 	def initializeQ(self):
@@ -66,11 +66,11 @@ class Qlearning:
 
 		# snow accumulation and temperature Q[action][Slevel, Tlevel]
 		elif(self.MODE==1):
-			Qtable = np.zeros(((2, 10, 12)))
+			Qtable = np.zeros(((2, 10, 9)))
 
 		# invalid MODE
 		else:
-			print('invalid MODE error!')
+			print('invalid MODE error')
 			sys.exit()
 
 		comp = False
@@ -81,15 +81,12 @@ class Qlearning:
 		if( temp < -8 ):	Tlevel = 0
 		elif( temp < -6 ):	Tlevel = 1
 		elif( temp < -4 ):	Tlevel = 2
-		elif( temp < -3 ):	Tlevel = 3
-		elif( temp < -2 ):	Tlevel = 4
-		elif( temp < -1 ):	Tlevel = 5
-		elif( temp < 0 ):	Tlevel = 6
-		elif( temp < 1 ):	Tlevel = 7
-		elif( temp < 2 ):	Tlevel = 8
-		elif( temp < 3 ):	Tlevel = 9
-		elif( temp < 4 ):	Tlevel = 10
-		else:				Tlevel = 11
+		elif( temp < -2 ):	Tlevel = 3
+		elif( temp < 0 ):	Tlevel = 4
+		elif( temp < 2 ):	Tlevel = 5
+		elif( temp < 4 ):	Tlevel = 6
+		elif( temp < 6 ):	Tlevel = 7
+		else:				Tlevel = 8
 		return Tlevel
 
 
@@ -138,8 +135,9 @@ class Qlearning:
 
 	def update_Q0(self, Q, comp, heater, Slevel, onSLv, offSLv):
 		reward = 0
-		if(Slevel<=4 and comp==False):
-			reward = self.r_comp
+		if(Slevel<=4):
+			if(comp==False):
+				reward += self.r_comp
 			comp = True
 		else:
 			comp = False
@@ -181,23 +179,26 @@ class Qlearning:
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
 			if( Q[1][onSLv] > Q[0][offSLv] ):
+#				self.logf.write(',\tnormal, ')
 				act = 1
 			elif( Q[1][onSLv] == Q[0][offSLv] ):
-				print('same next Q -> random choice')
-				self.logf.write('rnadom, ')
+#				print('same next Q -> random choice')
+#				self.logf.write(',\trandom, ')
 				act = random.choice(action)
 			else:
+#				self.logf.write(',\tnormal, ')
 				act = 0
 		elif( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
+#			self.logf.write(',\tnormal, ')
 			if(Slevel<=4):
 				act = 0
 			else:
 				act = 1	
 		else:
-			print('random choice (epsilon-greedy)')
-			self.logf.write('rnadom, ')
+#			print('random choice (epsilon-greedy)')
+#			self.logf.write(',\trandom, ')
 			act = random.choice(action)
-		self.logf.write(str(act)+'\n')
+#		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 
@@ -205,20 +206,24 @@ class Qlearning:
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
 			if( Q[1][onSLv][nextTLv] > Q[0][offSLv][nextTLv] ):
+#				self.logf.write(',\tnormal, ')
 				act = 1
 			elif( Q[1][onSLv][nextTLv] == Q[0][offSLv][nextTLv] ):
-				print('same next Q -> random choice')
-				self.logf.write('rnadom, ')
+#				print('same next Q -> random choice')
+#				self.logf.write(',\trandom, ')
 				act = random.choice(action)
 			else:
+#				self.logf.write(',\tnormal, ')
 				act = 0
 		elif( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
+#			self.logf.write(',\tnormal, ')
 			if(Slevel<=4):
 				act = 0
 			else:
 				act = 1	
 		else:
-			print('random choice')
-			self.logf.write('rnadom, ')
+#			print('random choice')
+#			self.logf.write(',\trandom, ')
 			act = random.choice(action)
+#		self.logf.write('\t'+str(act)+',\t')
 		return act
