@@ -52,8 +52,8 @@ class Qlearning:
 		self.r_comp = 10000
 
 		# epsilon-greedy
-		self.epsilon = 0.1
-		self.normal  = 0.2
+		self.epsilon = 0.2
+		self.normal  = 0.1
 
 		# log
 		self.logf = open('q_logs.txt', 'a')
@@ -66,7 +66,7 @@ class Qlearning:
 
 		# snow accumulation and temperature Q[action][Slevel, Tlevel]
 		elif(self.MODE==1):
-			Qtable = np.zeros(((2, 10, 13)))
+			Qtable = np.zeros(((2, 10, 12)))
 
 		# invalid MODE
 		else:
@@ -89,8 +89,7 @@ class Qlearning:
 		elif( temp < 2 ):	Tlevel = 8
 		elif( temp < 3 ):	Tlevel = 9
 		elif( temp < 4 ):	Tlevel = 10
-		elif( temp < 6 ):	Tlevel = 11
-		else:				Tlevel = 12
+		else:				Tlevel = 11
 		return Tlevel
 
 

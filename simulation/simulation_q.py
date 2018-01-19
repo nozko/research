@@ -12,6 +12,7 @@ import argparse
 import os
 import os.path
 import linecache
+import sys
 
 import q_control
 
@@ -135,7 +136,7 @@ class sim:
 class QL:
 	
 	def __init__(self):
-		alpha = 0.1
+		alpha = 0.2
 		gamma = 0.99
 		self.Qlearn = q_control.Qlearning(MODE, alpha, gamma, interval)
 
@@ -297,11 +298,7 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='weather data file')
 	parser.add_argument('weather')
-	parser.add_argument('--mode', '-m', default='short')
 	args = parser.parse_args()
-
-	if(os.path.exists('q_logs.txt')):
-		os.remove('q_logs.txt')
 
 	snow_minusT = 0
 	wet_minusT  = 0
@@ -344,6 +341,10 @@ if __name__ == '__main__':
 	try:
 		""" Q-learn loop """
 		for qnum in range(Qloop):
+			percent = float((qnum+1)/Qloop) * 100
+
+			if(os.path.exists('q_logs.txt')):
+				os.remove('q_logs.txt')
 
 			### 10 minutes loop ###
 			for m in range(data_num-1):
@@ -360,16 +361,12 @@ if __name__ == '__main__':
 				pre     = float(data1[9])/10	# [mm/min] precipitation
 				cloud   = float(data1[10])		# cloud cover
 				nightR  = 45					# [W/m^2] nighttime radiation
-				print('\n'+'temperature :',temp_o,'℃ ', \
-						'\tprecipitation :',pre, '[mm/min]')
 				data.close()
 
 				if(day != day_1):
 					day_cnt += 1
 					print('\n----- day', day_cnt, '-----')
 					sim().logf.write('\n----- day ' + str(day_cnt) + ' -----\n')
-					if(args.mode!='short'):
-						time.sleep(1)
 				day_1 = day
 
 				sun = sun/4.186*1000		# [kcal/m^2]
@@ -386,7 +383,7 @@ if __name__ == '__main__':
 				for intN in range(intervalN):
 					date = date + datetime.timedelta(minutes=interval)
 					sim().logf.write('\n' + str(date))
-					if(args.mode!='short'):	print('\n', date)
+					print('\n', date)
 
 					Wspeed = Wspeed0 * windC		# [m/sec] after ccorrection
 
@@ -539,7 +536,6 @@ if __name__ == '__main__':
 							melt = snow + snow_plus		# [kg/m^2]
 						if(melt < 0):
 							melt = 0
-						if(args.mode!='short'):	print('melt :', melt)
 
 					else:
 						tsv = BT			# (?)
@@ -650,11 +646,9 @@ if __name__ == '__main__':
 						ww = 0.0		# [kg/m^2]
 					Water = ww			# [kg/m^2]
 					snow  = Snow		# [kg/m^2]
-					if(args.mode!='short'):	print('snow  :', snow, '[kg/m^2]')
 					sim().logf.write('plus:'+str(snow_plus)+'[kg/m^2],\t')
 					sim().logf.write('snow:'+str(snow)+'[kg/m^2],\t')
 					cover = Scover			# [m]
-					if(args.mode!='short'):	print('cover :', cover, '[m]')
 
 					BT = T
 
@@ -664,13 +658,9 @@ if __name__ == '__main__':
 					Twet_on   = ntime[1][1] * interval
 					Tdry_off  = ntime[0][2] * interval
 					Tdry_on   = ntime[1][2] * interval
-					if(heater==0):
-						print('heater : off')
-					else:
-						print('heater : on')
 
-				if(args.mode!='short'):
-					time.sleep(0.5)
+					sys.stderr.write('\r{}℃ \t{}[mm/min]\t{}[kg/m^2]\t{}\t{}%'
+									.format(temp_o, pre, snow, heater, percent))
 
 
 	finally:
