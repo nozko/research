@@ -383,7 +383,6 @@ if __name__ == '__main__':
 				for intN in range(intervalN):
 					date = date + datetime.timedelta(minutes=interval)
 					sim().logf.write('\n' + str(date))
-					print('\n', date)
 
 					Wspeed = Wspeed0 * windC		# [m/sec] after ccorrection
 
@@ -659,8 +658,8 @@ if __name__ == '__main__':
 					Tdry_off  = ntime[0][2] * interval
 					Tdry_on   = ntime[1][2] * interval
 
-					sys.stderr.write('\r{}℃ \t{}[mm/min]\t{}[kg/m^2]\t{}\t{}%'
-									.format(temp_o, pre, snow, heater, percent))
+					sys.stderr.write('\r{}\t{}℃ \t{}[mm/min]\t{}[kg/m^2]\t{}\t{}%'
+								.format(date, temp_o, pre, snow, heater, percent))
 
 
 	finally:
