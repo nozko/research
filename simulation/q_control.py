@@ -8,8 +8,6 @@ import sys
 import numpy as np
 import random
 
-import road_simulation
-
 
 class control:
 
@@ -48,8 +46,7 @@ class Qlearning:
 
 		# rewards
 		self.r_on   = -1 * interval/100
-		self.r_off  = 0 * interval
-		self.r_comp = 10000
+		self.r_comp = 1000
 
 		# epsilon-greedy
 		self.epsilon = 0.2
@@ -62,11 +59,11 @@ class Qlearning:
 	def initializeQ(self):
 		# only snow accumulation Q[action][Slevel]
 		if(self.MODE==0):
-			Qtable = np.zeros((2, 10))
+			Qtable = np.zeros((2, 9))
 
 		# snow accumulation and temperature Q[action][Slevel, Tlevel]
 		elif(self.MODE==1):
-			Qtable = np.zeros(((2, 10, 9)))
+			Qtable = np.zeros(((2, 9, 7)))
 
 		# invalid MODE
 		else:
@@ -79,14 +76,12 @@ class Qlearning:
 
 	def Tlevel(self, temp):
 		if( temp < -8 ):	Tlevel = 0
-		elif( temp < -6 ):	Tlevel = 1
-		elif( temp < -4 ):	Tlevel = 2
-		elif( temp < -2 ):	Tlevel = 3
-		elif( temp < 0 ):	Tlevel = 4
-		elif( temp < 2 ):	Tlevel = 5
-		elif( temp < 4 ):	Tlevel = 6
-		elif( temp < 6 ):	Tlevel = 7
-		else:				Tlevel = 8
+		elif( temp < -5 ):	Tlevel = 1
+		elif( temp < -2 ):	Tlevel = 2
+		elif( temp < 0 ):	Tlevel = 3
+		elif( temp < 3 ):	Tlevel = 4
+		elif( temp < 6 ):	Tlevel = 5
+		else:				Tlevel = 6
 		return Tlevel
 
 
@@ -95,42 +90,29 @@ class Qlearning:
 			print('invalid value of snow accumulation')
 			sys.exit()
 		elif( snow < 0.01 ):	Slevel = 0
-		elif( snow < 0.02 ):	Slevel = 1
-		elif( snow < 0.03 ):	Slevel = 2
-		elif( snow < 0.04 ):	Slevel = 3
-		elif( snow < 0.05 ):	Slevel = 4
-		elif( snow < 0.07 ):	Slevel = 5
-		elif( snow < 0.1 ) :	Slevel = 6
-		elif( snow < 0.15 ):	Slevel = 7
-		elif( snow < 0.2 ) :	Slevel = 8
-		else:					Slevel = 9
+		elif( snow < 0.03 ):	Slevel = 1
+		elif( snow < 0.05 ):	Slevel = 2
+		elif( snow < 0.07 ):	Slevel = 3
+		elif( snow < 0.1 ) :	Slevel = 4
+		elif( snow < 0.15 ):	Slevel = 5
+		elif( snow < 0.2 ) :	Slevel = 6
+		elif( snow < 0.3 ) :	Slevel = 7
+		else:					Slevel = 8
 		return Slevel
 
 
-	def nextMax0(self, Q, heater, eachSLv):
-		if(heater==1):
-			if( Q[1][eachSLv] > Q[0][eachSLv] ):
-				return Q[1][eachSLv]
-			else:
-				return Q[0][eachSLv]
+	def nextMax0(self, Q, eachSLv):
+		if( Q[1][eachSLv] > Q[0][eachSLv] ):
+			return Q[1][eachSLv]
 		else:
-			if( Q[1][eachSLv] > Q[0][eachSLv] ):
-				return Q[1][eachSLv]
-			else:
-				return Q[0][eachSLv]
+			return Q[0][eachSLv]
 
 
-	def nextMax1(self, Q, heater, eachSLv, nextTLv):
-		if(heater==1):
-			if( Q[1][eachSLv][nextTLv] > Q[0][eachSLv][nextTLv] ):
-				return Q[1][eachSLv][nextTLv]
-			else:
-				return Q[0][eachSLv][nextTLv]
+	def nextMax1(self, Q, eachSLv, nextTLv):
+		if( Q[1][eachSLv][nextTLv] > Q[0][eachSLv][nextTLv] ):
+			return Q[1][eachSLv][nextTLv]
 		else:
-			if( Q[1][eachSLv][nextTLv] > Q[0][eachSLv][nextTLv] ):
-				return Q[1][eachSLv][nextTLv]
-			else:
-				return Q[0][eachSLv][nextTLv]
+			return Q[0][eachSLv][nextTLv]
 
 
 	def update_Q0(self, Q, comp, heater, Slevel, onSLv, offSLv):
@@ -144,11 +126,11 @@ class Qlearning:
 
 		if(heater==1):
 			reward += self.r_on
-			nextMax = self.nextMax0(Q, 1, onSLv)
+			nextMax = self.nextMax0(Q, onSLv)
 			Q[1][Slevel] = (1-self.alpha) * Q[1][Slevel] \
 							+ self.alpha * (reward + self.gamma*nextMax)
 		else:
-			nextMax = self.nextMax0(Q, 0, offSLv)
+			nextMax = self.nextMax0(Q, offSLv)
 			Q[0][Slevel] = (1-self.alpha) * Q[0][Slevel] \
 							+ self.alpha * (reward + self.gamma*nextMax)
 		return Q, comp
@@ -164,11 +146,11 @@ class Qlearning:
 
 		if(heater==1):
 			reward += self.r_on
-			nextMax = self.nextMax1(Q, 1, onSLv, nextTLv)
+			nextMax = self.nextMax1(Q, onSLv, nextTLv)
 			Q[1][Slevel][Tlevel] = (1-self.alpha) * Q[1][Slevel][Tlevel] \
 								+ self.alpha * (reward + self.gamma*nextMax)
 		else:
-			nextMax = self.nextMax1(Q, 0, offSLv, nextTLv)
+			nextMax = self.nextMax1(Q, offSLv, nextTLv)
 			Q[0][Slevel][Tlevel] = (1-self.alpha) * Q[0][Slevel][Tlevel] \
 								+ self.alpha * (reward + self.gamma*nextMax)
 		return Q, comp
@@ -179,51 +161,51 @@ class Qlearning:
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
 			if( Q[1][onSLv] > Q[0][offSLv] ):
-#				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal, ')
 				act = 1
 			elif( Q[1][onSLv] == Q[0][offSLv] ):
 #				print('same next Q -> random choice')
-#				self.logf.write(',\trandom, ')
+				self.logf.write(',\trandom, ')
 				act = random.choice(action)
 			else:
-#				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal, ')
 				act = 0
 		elif( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
-#			self.logf.write(',\tnormal, ')
+			self.logf.write(',\tnormal, ')
 			if(Slevel<=4):
 				act = 0
 			else:
 				act = 1	
 		else:
 #			print('random choice (epsilon-greedy)')
-#			self.logf.write(',\trandom, ')
+			self.logf.write(',\trandom, ')
 			act = random.choice(action)
-#		self.logf.write('\t'+str(act)+',\t')
+		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 
 	def select_act1(self, Q, Slevel, onSLv, offSLv, nextTLv):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
-			if( Q[1][onSLv][nextTLv] > Q[0][offSLv][nextTLv] ):
-#				self.logf.write(',\tnormal, ')
+			if( Q[1][Slevel][nextTLv] > Q[0][Slevel][nextTLv] ):
+				self.logf.write(',\tnormal, ')
 				act = 1
-			elif( Q[1][onSLv][nextTLv] == Q[0][offSLv][nextTLv] ):
+			elif( Q[1][Slevel][nextTLv] == Q[0][Slevel][nextTLv] ):
 #				print('same next Q -> random choice')
-#				self.logf.write(',\trandom, ')
+				self.logf.write(',\trandom, ')
 				act = random.choice(action)
 			else:
-#				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal, ')
 				act = 0
 		elif( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
-#			self.logf.write(',\tnormal, ')
+			self.logf.write(',\tnormal, ')
 			if(Slevel<=4):
 				act = 0
 			else:
 				act = 1	
 		else:
 #			print('random choice')
-#			self.logf.write(',\trandom, ')
+			self.logf.write(',\trandom, ')
 			act = random.choice(action)
-#		self.logf.write('\t'+str(act)+',\t')
+		self.logf.write('\t'+str(act)+',\t')
 		return act

@@ -18,7 +18,7 @@ import q_control
 
 
 interval = 3			# [min] calculatioin interval
-Qloop    = 500
+Qloop    = 5000
 MODE     = 1
 # MODE:0 -> only snow accumulation
 # MODE:1 -> snow accumulation and temperature
@@ -316,13 +316,13 @@ if __name__ == '__main__':
 	lpmx   = 0
 	ntime  = np.zeros((2, 3))
 	Qr     = 0		# Q from surface(snowing, more than 0℃ )
-	Qe    = 0
-	BF    = 0
-	Water = 0		# [kg/m^2]
-	Snow  = 0
-	ww    = 0		# [kg/m^2]
-	htr   = 0
-	sat   = 0		# 相当外気温 Sol-Air Temperature
+	Qe     = 0
+	BF     = 0
+	Water  = 0		# [kg/m^2]
+	Snow   = 0
+	ww     = 0		# [kg/m^2]
+	htr    = 0
+	sat    = 0		# 相当外気温 Sol-Air Temperature
 
 	snow   = 0.0	# [kg/m^2] snow mass
 	Scover = 0.0	# [m] snow volume
@@ -347,7 +347,6 @@ if __name__ == '__main__':
 		""" Q-learn loop """
 		for qnum in range(Qloop):
 			percent = float(qnum)/Qloop * 100
-			print('\n----- loop '+str(qnum+1)+' -----')
 			data_cnt = 0
 
 			if(os.path.exists('q_logs_'+str(MODE)+'.txt')):
@@ -375,6 +374,7 @@ if __name__ == '__main__':
 					shift = True
 					data_cnt += 1
 					t0 = temp_o
+					percent += 100.0/Qloop /data_num
 
 					data1 = all_data[data_cnt].split(', ')
 					month   = int(data1[1])
@@ -389,25 +389,13 @@ if __name__ == '__main__':
 					cloud   = float(data1[10])		# cloud cover
 					nightR  = 45					# [W/m^2] nighttime radiation
 
-					if(int(date.day)!=int(day)):
-						print('day error')
-						print(int(date.day), int(day))
-						sys.exit()
-					if(int(date.hour)!=int(Hour)):
-						print('hour error')
-						print(int(date.hour), int(hour))
-						sys.exit()
-					if(int(date.minute//10)!=int(minute//10)):
-						print('minute error')
-						print(int(date.minute), int(minute))
-						sys.exit()
-
 					sun = sun/4.186*1000		# [kcal/m^2]
 
 					# absolute humidity, night R
 					absH, nightR = sim().absoluteHumid(vaporP,cloud,temp_o,nightR)
 
 					oldmin = minute//10
+
 
 				elif( (int(date.minute)+interval)//10 != oldmin ):
 					shift = True
@@ -671,9 +659,10 @@ if __name__ == '__main__':
 					ww = 0.0		# [kg/m^2]
 				Water = ww			# [kg/m^2]
 				snow  = Snow		# [kg/m^2]
-				sim().logf.write('\t+{:.2f}[kg/m^2]  ' .format(snow_plus))
+				sim().logf.write('{:>5}℃\t' .format(temp_o))
+				sim().logf.write('+{:.2f}[kg/m^2]  ' .format(snow_plus))
 				sim().logf.write('-> {:.3f}[kg/m^2]' .format(snow))
-				cover = Scover			# [m]
+				cover = Scover		# [m]
 
 				BT = T
 
@@ -684,7 +673,9 @@ if __name__ == '__main__':
 				Tdry_off  = ntime[0][2] * interval
 				Tdry_on   = ntime[1][2] * interval
 
-				sys.stderr.write('\r{}  {}℃\t{:.3f}[mm/min]  {:.3f}[kg/m^2]  {}  {}%' .format(date, temp_o, pre, snow, heater, percent))
+				str_snow = '{:.3f}[kg/m^2]' .format(snow)
+				sys.stderr.write('\r{} {:>6}℃   {:.3f}[mm/min] {:>15}  {}  {:.2f}%'
+						.format(date, temp_o, pre, str_snow, heater, percent))
 
 				date = date + datetime.timedelta(minutes=interval)
 
@@ -707,4 +698,4 @@ if __name__ == '__main__':
 		sim().logf.write('\n'+str(Qtable))
 
 		time = time.time() - start
-		print('\ntime{0:4d}:{0:02d}' .format(int(time//60), int(time%60)))
+		print('\ntime{0:4d}:{0:02d}' .format(int(time)//60, int(time)%60))
