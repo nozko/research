@@ -18,10 +18,6 @@ import q_control
 
 
 interval = 3			# [min] calculatioin interval
-Qloop    = 5000
-MODE     = 1
-# MODE:0 -> only snow accumulation
-# MODE:1 -> snow accumulation and temperature
 
 
 CK      = 1.0		# 緩和係数(0.7~1.5程度)
@@ -135,7 +131,7 @@ class sim:
 class QL:
 	
 	def __init__(self):
-		alpha = 0.2
+		alpha = 0.1
 		gamma = 0.99
 		self.Qlearn = q_control.Qlearning(MODE, alpha, gamma, interval)
 
@@ -145,9 +141,19 @@ class QL:
 			nextTemp = float(all_data[data_cnt+1].split(', ')[5])
 		else:
 			nextTemp = float(all_data[data_cnt].split(', ')[5])
-			
+
 		nextTLv = self.Qlearn.Tlevel(nextTemp)
 		return nextTLv
+
+
+	def next_Plevel(self, all_data, shift, data_cnt):
+		if(shift):
+			nextPre = float(all_data[data_cnt+1].split(', ')[9]) / 10
+		else:
+			nextPre = float(all_data[data_cnt].split(', ')[9]) / 10
+
+		nextPLv = self.Qlearn.Plevel(nextPre)
+		return nextPLv
 
 
 	def next_Slevel(self, act, cover, temp_o, nightR, Wspeed, Water, \
@@ -298,14 +304,29 @@ if __name__ == '__main__':
 	start = time.time()
 	print('start time :', time.ctime())
 
-	parser = argparse.ArgumentParser(description='weather data file')
-	parser.add_argument('weather')
+	parser = argparse.ArgumentParser(description='MODE')
+	parser.add_argument('MODE', help='S, P, ST, SP' )
+	parser.add_argument('loop_num', default=1000)
 	args = parser.parse_args()
+
+	global MODE, Qloop
+	Qloop = int(args.loop_num)
+	MODE  = args.MODE
+	# MODE S : snow accumulation
+	# MODE T : temperature
+	# MODE P : precipitation
+	if(MODE!='S' and MODE!='P' and MODE!='ST' and MODE!='SP'):
+		print('invalid MODE ERROR')
+		sys.exit()
+	elif( Qloop < 1 ):
+		print('NO LOOP')
+		sys.exit()
 
 	snow_minusT = 0
 	wet_minusT  = 0
 
 	print('interval :', interval, '[min]')
+	print('  MODE   :', MODE)
 
 	# initialize
 	temp_o = 0		# temperature outside
@@ -330,7 +351,7 @@ if __name__ == '__main__':
 
 	tset = 0
 
-	data     = open(args.weather, 'r')
+	data     = open('sapporo2017.csv', 'r')
 	all_data = data.readlines()
 	data_num = len(all_data) - 1
 	data.close()
@@ -349,8 +370,8 @@ if __name__ == '__main__':
 			percent = float(qnum)/Qloop * 100
 			data_cnt = 0
 
-			if(os.path.exists('q_logs_'+str(MODE)+'.txt')):
-				os.remove('q_logs_'+str(MODE)+'.txt')
+#			if(os.path.exists('q_logs_'+str(MODE)+'.txt')):
+#				os.remove('q_logs_'+str(MODE)+'.txt')
 
 			data1 = all_data[1].split(', ')
 			month  = int(data1[1])
@@ -365,7 +386,7 @@ if __name__ == '__main__':
 				if(day != day_1):
 					day_cnt += 1
 				day_1 = day
-				sim().logf.write('\n' + str(date))
+#				sim().logf.write('\n' + str(date))
 
 				shift = False
 
@@ -441,33 +462,47 @@ if __name__ == '__main__':
 				""" Q learning """
 				# levels
 				Slevel = QL().Qlearn.Slevel(snow)
-				onSLv  = QL().next_Slevel(1, cover, temp_o, nightR, \
-											Wspeed, Water, rain_plus, snow, \
-											snow_plus, sfdens, tset, ilp, Qr)
-				offSLv = QL().next_Slevel(0, cover, temp_o, nightR, \
-											Wspeed, Water, rain_plus, snow, \
-											snow_plus, sfdens, tset, ilp, Qr)
-				if(MODE>=1):
+				if( MODE.find('S') >= 0 ):
+					onSLv  = QL().next_Slevel(1, cover, temp_o, nightR, \
+												Wspeed, Water, rain_plus, snow,\
+												snow_plus, sfdens, tset, ilp, Qr)
+					offSLv = QL().next_Slevel(0, cover, temp_o, nightR, \
+												Wspeed, Water, rain_plus, snow,\
+												snow_plus, sfdens, tset, ilp, Qr)
+				if( MODE.find('T') >= 0 ):
 					Tlevel = QL().Qlearn.Tlevel(temp_o)
 					nextTLv = QL().next_Tlevel(all_data, shift, data_cnt)
-					if(MODE>=2):
-						pass
+				if( MODE.find('P') >= 0 ):
+					Plevel = QL().Qlearn.Plevel(pre)
+					nextPLv = QL().next_Plevel(all_data, shift, data_cnt)
 
 				# decide action
-				if( MODE==0 ):
-					heater = QL().Qlearn.select_act0(Qtable,Slevel,onSLv,offSLv)
-				elif( MODE==1 ):
-					heater = QL().Qlearn.select_act1(Qtable, Slevel, onSLv, \
-														offSLv, nextTLv)
+				if( MODE == 'S' ):
+					heater = QL().Qlearn.select_act_S(Qtable,Slevel,onSLv,offSLv)
+				if( MODE == 'P' ):
+					heater = QL().Qlearn.select_act_P(Qtable,Slevel,Plevel,nextPLv)
+				elif( MODE=='ST' or MODE=='TS' ):
+					heater = QL().Qlearn.select_act_ST(Qtable, Slevel, Tlevel,\
+														onSLv, offSLv, nextTLv)
+				elif( MODE=='SP' or MODE=='PS' ):
+					heater = QL().Qlearn.select_act_SP(Qtable, Slevel, Plevel,\
+														onSLv, offSLv, nextPLv)
 
 				# update Q table
-				if(MODE==0):
-					Qtable, comp = QL().Qlearn.update_Q0(Qtable, comp, heater,\
+				if( MODE == 'S' ):
+					Qtable, comp = QL().Qlearn.updateQ_S(Qtable, comp, heater,\
 														Slevel, onSLv, offSLv)
-				elif(MODE==1):
-					Qtable, comp = QL().Qlearn.update_Q1(Qtable, comp, heater, \
-														Slevel, Tlevel, onSLv, \
+				elif( MODE=='ST' or MODE=='TS' ):
+					Qtable, comp = QL().Qlearn.updateQ_ST(Qtable, comp, heater,\
+														Slevel, Tlevel, onSLv,\
 														offSLv, nextTLv)
+				elif( MODE == 'P' ):
+					Qtable, comp = QL().Qlearn.updateQ_P(Qtable, comp, heater,\
+														Slevel, Plevel, nextPLv)
+				elif( MODE=='SP' or mode=='PS' ):
+					Qtable, comp = QL().Qlearn.updateQ_SP(Qtable, comp, heater,\
+														Slevel, Plevel, onSLv,\
+														offSLv, nextPLv)
 
 
 				ntime[heater][level] += 1
@@ -659,9 +694,9 @@ if __name__ == '__main__':
 					ww = 0.0		# [kg/m^2]
 				Water = ww			# [kg/m^2]
 				snow  = Snow		# [kg/m^2]
-				sim().logf.write('{:>5}℃\t' .format(temp_o))
-				sim().logf.write('+{:.2f}[kg/m^2]  ' .format(snow_plus))
-				sim().logf.write('-> {:.3f}[kg/m^2]' .format(snow))
+#				sim().logf.write('{:>5}℃\t' .format(temp_o))
+#				sim().logf.write('+{:.2f}[kg/m^2]  ' .format(snow_plus))
+#				sim().logf.write('-> {:.3f}[kg/m^2]' .format(snow))
 				cover = Scover		# [m]
 
 				BT = T
@@ -679,7 +714,9 @@ if __name__ == '__main__':
 
 				date = date + datetime.timedelta(minutes=interval)
 
-#			sim().logf.write('\n'+str(Qtable)+'\n')
+#				time.sleep(0.5)
+
+			sim().logf.write('\n'+str(Qtable)+'\n')
 
 	finally:
 		onT         = onT * interval			# [min]
