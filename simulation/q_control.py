@@ -7,6 +7,7 @@ import argparse
 import sys
 import numpy as np
 import random
+import time
 
 
 class control:
@@ -36,8 +37,7 @@ action = [0, 1]		# off:0, on:1
 
 class Qlearning:
 
-	def __init__(self, MODE, Qloop, alpha, gamma, interval):
-
+	def __init__(self, MODE, alpha, gamma, interval):
 		self.MODE = MODE
 
 		# parameters
@@ -53,7 +53,7 @@ class Qlearning:
 		self.normal  = 0.0
 
 		# log
-		self.logf = open('q_logs_'+MODE+str(Qloop)+'.txt', 'a')
+		self.logf = open('q_logs_'+MODE+'.txt', 'a')
 
 
 	def initializeQ(self):
@@ -62,15 +62,20 @@ class Qlearning:
 			Qtable = np.zeros((2, 7))
 
 		# snow accumulation and temperature Q[action][Slevel][Tlevel]
-		elif( self.MODE == 'ST' or self.MODE == 'TS' ):
+		elif( self.MODE == 'ST' ):
 			Qtable = np.zeros(((2, 7, 6)))
 
 		# precipitation Q[action][Plevel]
 		elif( self.MODE == 'P' ):
 			Qtable = np.zeros((2, 5))
 
-		elif( self.MODE=='SP' or self.MODE=='PS' ):
-			Qtable = np.zeros((2, 7, 5))
+		# temperature and Precipitation Q[action][Tlevel][Plevel]
+		elif( self.MODE == 'TP' ):
+			Qtable = np.zeros(((2, 6, 5)))
+
+		# snow accumulation and precipitation Q[action][Slevel][Plevel]
+		elif( self.MODE=='SP' ):
+			Qtable = np.zeros(((2, 7, 5)))
 
 		# invalid MODE
 		else:
@@ -205,6 +210,35 @@ class Qlearning:
 		return Q, comp
 
 
+	def nextMax_TP(self, Q, nextTLv, nextPLv):
+		if( Q[1][nextTLv][nextPLv] > Q[0][nextTLv][nextPLv] ):
+			return Q[1][nextTLv][nextPLv]
+		else:
+			return Q[0][nextTLv][nextPLv]
+
+
+	def updateQ_TP(self, Q, comp, heater, Slevel, Tlevel, Plevel, nextTLv, nextPLv):
+		reward = 0
+		if(Slevel<=2):
+			if(comp==False):
+				reward += self.r_comp
+			comp = True
+		else:
+			comp = False
+
+		nextMax = self.nextMax_TP(Q, nextTLv, nextPLv)
+		if(heater==1):
+			reward += self.r_on
+			Q[1][Tlevel][Plevel] = (1-self.alpha) * Q[1][Tlevel][Plevel]\
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[1][Tlevel][Plevel] = '{:.3f}' .format(Q[1][Tlevel][Plevel])
+		else:
+			Q[0][Tlevel][Plevel] = (1-self.alpha) * Q[0][Tlevel][Plevel]\
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[0][Tlevel][Plevel] = '{:.3f}' .format(Q[0][Tlevel][Plevel])
+		return Q, comp
+
+
 	def nextMax_SP(self, Q, eachSLv, nextPLv):
 		if( Q[1][eachSLv][nextPLv] > Q[0][eachSLv][nextPLv] ):
 			return Q[1][eachSLv][nextPLv]
@@ -291,6 +325,21 @@ class Qlearning:
 		return act
 
 
+	def select_act_TP(self, Q, Slevel, Tlevel, Plevel, nextTLv, nextPLv):
+		rand = random.random()
+		if( rand > (self.epsilon+self.normal) ):
+			if( Q[1][Tlevel][Plevel] > Q[0][Tlevel][Plevel] ):
+				self.logf.write(',\tnormal, ')
+				act = 1
+			else:
+				self.logf.write(',\tnormal, ')
+				act = 0
+		else:
+			act = self.random_act(rand, Slevel)
+		self.logf.write('\t'+str(act)+',\t')
+		return act
+
+
 	def select_act_SP(self, Q, Slevel, Plevel, onSLv, offSLv, nextPLv):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
@@ -304,3 +353,105 @@ class Qlearning:
 			act = self.random_act(rand, Slevel)
 		self.logf.write('\t'+str(act)+',\t')
 		return act
+
+
+
+if __name__ == '__main__':
+	start = time.time()
+	print('start time :', time.ctime())
+
+	action = ['north', 'south', 'east', 'west']
+	alpha = 0.1
+	gamma = 0.9
+	epsilon = 0.2
+
+	# rewards
+	r_move = -1
+	r_goal = 100
+
+	# initialize Q table
+	Q = np.zeros(((4, 4, 4)))
+
+
+	try:
+		for num in range(10000):
+			print('----- episode {} -----' .format(num+1))
+			state = np.zeros(2, dtype=int)
+			nextstate = np.zeros(2, dtype=int)
+
+			while(True):
+
+				# decide action
+				if( random.random() > epsilon ):
+					if( state[1]<3 ):
+						Qmax = Q[state[0]][state[1]][0]
+						act = 'north'
+					elif( state[1]>0 ):
+						Qmax = Q[state[0]][state[1]][1]
+						act = 'south'
+
+					if( Q[state[0]][state[1]][1]>Qmax and state[1]>0 ):
+						Qmax = Q[state[0]][state[1]][1]
+						act = 'south'
+					if( Q[state[0]][state[1]][2]>Qmax and state[0]<3 ):
+						Qmax = Q[state[0]][state[1]][2]
+						act = 'east'
+					if( Q[state[0]][state[1]][3]>Qmax and state[0]>0 ):
+						Qmax = Q[state[0]][state[1]][3]
+						act = 'west'
+
+				else:
+					del_list = []
+					if( state[1]>=3 ):
+						del_list.append(0)
+					elif( state[1]<=0 ):
+						del_list.append(1)
+					if( state[0]>=3 ):
+						del_list.append(2)
+					elif( state[0]<=0 ):
+						del_list.append(3)
+					A = np.delete(action, del_list)
+					act = random.choice(A)
+
+				if( act=='north' ):
+					a = 0
+					nextstate[1] += 1
+					print(act)
+				elif( act=='south' ):
+					a = 1
+					nextstate[1] -= 1
+					print(act)
+				elif( act=='east' ):
+					a = 2
+					nextstate[0] += 1
+					print(act)
+				else:
+					a = 3
+					nextstate[0] -= 1
+					print(act)
+				print(state)
+
+				# update Q table
+				reward = r_move
+				if( nextstate[0]==3 and nextstate[1]==3 ):
+					reward += r_goal
+					print('goal!')
+
+				nextMax = max(Q[nextstate[0]][nextstate[1]])
+				Q[state[0]][state[1]][a] = (1-alpha) * Q[state[0]][state[1]][a]\
+											+ alpha * (reward + gamma*nextMax)
+
+	
+				if( act=='north' ):		state[1] += 1
+				elif( act=='south' ):	state[1] -= 1
+				elif( act=='east' ):	state[0] += 1
+				else:					state[0] -= 1
+
+				if( state[0]==3 and state[1]==3 ):
+					break
+
+#			time.sleep(1)
+#			print(Q)
+
+	finally:
+		print(Q)

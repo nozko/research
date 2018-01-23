@@ -51,7 +51,7 @@ class sim:
 
 	def __init__(self):
 		self.net  = open('file.net', 'r')
-		self.logf = open('q_logs_'+MODE+str(Qloop)+'.txt', 'a')
+		self.logf = open('q_logs_'+str(MODE)+'.txt', 'a')
 
 		self.control = q_control.control()
 
@@ -133,7 +133,7 @@ class QL:
 	def __init__(self):
 		alpha = 0.1
 		gamma = 0.99
-		self.Qlearn = q_control.Qlearning(MODE, Qloop, alpha, gamma, interval)
+		self.Qlearn = q_control.Qlearning(MODE, alpha, gamma, interval)
 
 
 	def next_Tlevel(self, all_data, shift, data_cnt):
@@ -305,8 +305,8 @@ if __name__ == '__main__':
 	print('start time :', time.ctime())
 
 	parser = argparse.ArgumentParser(description='MODE')
-	parser.add_argument('MODE', help='S, P, ST, SP' )
-	parser.add_argument('loop_num', default=1000)
+	parser.add_argument('MODE', help='S, P, ST, TP or SP' )
+	parser.add_argument('--loop_num', '-l', default=5000)
 	args = parser.parse_args()
 
 	global MODE, Qloop
@@ -315,18 +315,18 @@ if __name__ == '__main__':
 	# MODE S : snow accumulation
 	# MODE T : temperature
 	# MODE P : precipitation
-	if(MODE!='S' and MODE!='P' and MODE!='ST' and MODE!='SP'):
-		print('invalid MODE ERROR')
+	if(MODE!='S' and MODE!='P' and MODE!='ST' and MODE!='TP' and MODE!='SP'):
+		print('!!! invalid MODE ERROR !!!')
 		sys.exit()
 	elif( Qloop < 1 ):
-		print('NO LOOP')
+		print('! NO LOOP !')
 		sys.exit()
 
 	snow_minusT = 0
 	wet_minusT  = 0
 
 	print('interval :', interval, '[min]')
-	print('  MODE   :', MODE, '\tloop num :', Qloop)
+	print('  MODE   :', MODE)
 
 	# initialize
 	temp_o = 0		# temperature outside
@@ -370,8 +370,8 @@ if __name__ == '__main__':
 			percent = float(qnum)/Qloop * 100
 			data_cnt = 0
 
-			if(os.path.exists('q_logs_'+MODE+str(Qloop)+'.txt')):
-				os.remove('q_logs_'+MODE+str(Qloop)+'.txt')
+			if(os.path.exists('q_logs_'+str(MODE)+'.txt')):
+				os.remove('q_logs_'+str(MODE)+'.txt')
 
 			data1 = all_data[1].split(', ')
 			month  = int(data1[1])
@@ -481,10 +481,13 @@ if __name__ == '__main__':
 					heater = QL().Qlearn.select_act_S(Qtable,Slevel,onSLv,offSLv)
 				if( MODE == 'P' ):
 					heater = QL().Qlearn.select_act_P(Qtable,Slevel,Plevel,nextPLv)
-				elif( MODE=='ST' or MODE=='TS' ):
+				elif( MODE=='ST' ):
 					heater = QL().Qlearn.select_act_ST(Qtable, Slevel, Tlevel,\
 														onSLv, offSLv, nextTLv)
-				elif( MODE=='SP' or MODE=='PS' ):
+				elif( MODE=='TP' ):
+					heater = QL().Qlearn.select_act_TP(Qtable, Slevel, Tlevel,\
+														Plevel, nextTLv, nextTLv)
+				elif( MODE=='SP' ):
 					heater = QL().Qlearn.select_act_SP(Qtable, Slevel, Plevel,\
 														onSLv, offSLv, nextPLv)
 
@@ -492,14 +495,18 @@ if __name__ == '__main__':
 				if( MODE == 'S' ):
 					Qtable, comp = QL().Qlearn.updateQ_S(Qtable, comp, heater,\
 														Slevel, onSLv, offSLv)
-				elif( MODE=='ST' or MODE=='TS' ):
+				elif( MODE == 'ST' ):
 					Qtable, comp = QL().Qlearn.updateQ_ST(Qtable, comp, heater,\
 														Slevel, Tlevel, onSLv,\
 														offSLv, nextTLv)
+				elif( MODE == 'TP' ):
+					Qtable, comp = QL().Qlearn.updateQ_TP(Qtable, comp, heater,\
+														Slevel, Tlevel, Plevel,\
+														nextTLv, nextPLv)
 				elif( MODE == 'P' ):
 					Qtable, comp = QL().Qlearn.updateQ_P(Qtable, comp, heater,\
 														Slevel, Plevel, nextPLv)
-				elif( MODE=='SP' or mode=='PS' ):
+				elif( MODE=='SP' ):
 					Qtable, comp = QL().Qlearn.updateQ_SP(Qtable, comp, heater,\
 														Slevel, Plevel, onSLv,\
 														offSLv, nextPLv)
