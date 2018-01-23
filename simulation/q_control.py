@@ -36,7 +36,7 @@ action = [0, 1]		# off:0, on:1
 
 class Qlearning:
 
-	def __init__(self, MODE, alpha, gamma, interval):
+	def __init__(self, MODE, Qloop, alpha, gamma, interval):
 
 		self.MODE = MODE
 
@@ -53,24 +53,24 @@ class Qlearning:
 		self.normal  = 0.0
 
 		# log
-		self.logf = open('q_logs_'+MODE+'.txt', 'a')
+		self.logf = open('q_logs_'+MODE+str(Qloop)+'.txt', 'a')
 
 
 	def initializeQ(self):
 		# accumulation Q[action][Slevel]
 		if( self.MODE == 'S' ):
-			Qtable = np.zeros((2, 9))
+			Qtable = np.zeros((2, 7))
 
 		# snow accumulation and temperature Q[action][Slevel][Tlevel]
 		elif( self.MODE == 'ST' or self.MODE == 'TS' ):
-			Qtable = np.zeros(((2, 9, 7)))
+			Qtable = np.zeros(((2, 7, 6)))
 
 		# precipitation Q[action][Plevel]
 		elif( self.MODE == 'P' ):
 			Qtable = np.zeros((2, 5))
 
 		elif( self.MODE=='SP' or self.MODE=='PS' ):
-			Qtable = np.zeros((2, 9, 5))
+			Qtable = np.zeros((2, 7, 5))
 
 		# invalid MODE
 		else:
@@ -82,13 +82,12 @@ class Qlearning:
 
 
 	def Tlevel(self, temp):
-		if( temp < -8 ):	Tlevel = 0
-		elif( temp < -5 ):	Tlevel = 1
-		elif( temp < -2 ):	Tlevel = 2
-		elif( temp < 0 ):	Tlevel = 3
-		elif( temp < 3 ):	Tlevel = 4
-		elif( temp < 6 ):	Tlevel = 5
-		else:				Tlevel = 6
+		if( temp < -6 ):	Tlevel = 0
+		elif( temp < -3 ):	Tlevel = 1
+		elif( temp < 0 ):	Tlevel = 2
+		elif( temp < 3 ):	Tlevel = 3
+		elif( temp < 6 ):	Tlevel = 4
+		else:				Tlevel = 5
 		return Tlevel
 
 
@@ -96,15 +95,13 @@ class Qlearning:
 		if( snow < 0 ):
 			print('invalid value of snow accumulation')
 			sys.exit()
-		elif( snow < 0.01 ):	Slevel = 0
-		elif( snow < 0.03 ):	Slevel = 1
-		elif( snow < 0.05 ):	Slevel = 2
-		elif( snow < 0.07 ):	Slevel = 3
-		elif( snow < 0.1 ) :	Slevel = 4
-		elif( snow < 0.15 ):	Slevel = 5
-		elif( snow < 0.2 ) :	Slevel = 6
-		elif( snow < 0.3 ) :	Slevel = 7
-		else:					Slevel = 8
+		elif( snow < 0.03 ):	Slevel = 0
+		elif( snow < 0.05 ):	Slevel = 1
+		elif( snow < 0.1 ) :	Slevel = 2
+		elif( snow < 0.2 ) :	Slevel = 3
+		elif( snow < 0.3 ) :	Slevel = 4
+		elif( snow < 0.5 ) :	Slevel = 5
+		else:					Slevel = 6
 		return Slevel
 
 	def Plevel(self, pre):
@@ -240,11 +237,11 @@ class Qlearning:
 
 	def random_act(self, rand, Slevel):
 		if( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
-#			self.logf.write(',\tnormal, ')
+			self.logf.write(',\tnormal, ')
 			if(Slevel<=2):		act = 0
 			else:				act = 1
 		else:
-#			self.logf.write(',\trandom, ')
+			self.logf.write(',\trandom, ')
 			act = random.choice(action)
 		return act
 
@@ -253,14 +250,14 @@ class Qlearning:
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
 			if( Q[1][onSLv] > Q[0][offSLv] ):
-#				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal, ')
 				act = 1
 			else:
-#				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Slevel)
-#		self.logf.write('\t'+str(act)+',\t')
+		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 

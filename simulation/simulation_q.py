@@ -51,7 +51,7 @@ class sim:
 
 	def __init__(self):
 		self.net  = open('file.net', 'r')
-		self.logf = open('q_logs_'+str(MODE)+'.txt', 'a')
+		self.logf = open('q_logs_'+MODE+str(Qloop)+'.txt', 'a')
 
 		self.control = q_control.control()
 
@@ -133,7 +133,7 @@ class QL:
 	def __init__(self):
 		alpha = 0.1
 		gamma = 0.99
-		self.Qlearn = q_control.Qlearning(MODE, alpha, gamma, interval)
+		self.Qlearn = q_control.Qlearning(MODE, Qloop, alpha, gamma, interval)
 
 
 	def next_Tlevel(self, all_data, shift, data_cnt):
@@ -326,7 +326,7 @@ if __name__ == '__main__':
 	wet_minusT  = 0
 
 	print('interval :', interval, '[min]')
-	print('  MODE   :', MODE)
+	print('  MODE   :', MODE, '\tloop num :', Qloop)
 
 	# initialize
 	temp_o = 0		# temperature outside
@@ -370,8 +370,8 @@ if __name__ == '__main__':
 			percent = float(qnum)/Qloop * 100
 			data_cnt = 0
 
-#			if(os.path.exists('q_logs_'+str(MODE)+'.txt')):
-#				os.remove('q_logs_'+str(MODE)+'.txt')
+			if(os.path.exists('q_logs_'+MODE+str(Qloop)+'.txt')):
+				os.remove('q_logs_'+MODE+str(Qloop)+'.txt')
 
 			data1 = all_data[1].split(', ')
 			month  = int(data1[1])
@@ -386,7 +386,7 @@ if __name__ == '__main__':
 				if(day != day_1):
 					day_cnt += 1
 				day_1 = day
-#				sim().logf.write('\n' + str(date))
+				sim().logf.write('\n' + str(date))
 
 				shift = False
 
@@ -694,9 +694,9 @@ if __name__ == '__main__':
 					ww = 0.0		# [kg/m^2]
 				Water = ww			# [kg/m^2]
 				snow  = Snow		# [kg/m^2]
-#				sim().logf.write('{:>5}℃\t' .format(temp_o))
-#				sim().logf.write('+{:.2f}[kg/m^2]  ' .format(snow_plus))
-#				sim().logf.write('-> {:.3f}[kg/m^2]' .format(snow))
+				sim().logf.write('{:>5}℃\t' .format(temp_o))
+				sim().logf.write('+{:.2f}[kg/m^2]  ' .format(snow_plus))
+				sim().logf.write('-> {:.3f}[kg/m^2]' .format(snow))
 				cover = Scover		# [m]
 
 				BT = T
@@ -716,7 +716,7 @@ if __name__ == '__main__':
 
 #				time.sleep(0.5)
 
-			sim().logf.write('\n'+str(Qtable)+'\n')
+#			sim().logf.write('\n'+str(Qtable)+'\n')
 
 	finally:
 		onT         = onT * interval			# [min]
