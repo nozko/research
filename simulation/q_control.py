@@ -37,7 +37,7 @@ action = [0, 1]		# off:0, on:1
 
 class Qlearning:
 
-	def __init__(self, MODE, alpha, gamma, interval):
+	def __init__(self, MODE, Qloop, alpha, gamma, interval):
 		self.MODE = MODE
 
 		# parameters
@@ -45,37 +45,51 @@ class Qlearning:
 		self.gamma = gamma
 
 		# rewards
-		self.r_on   = -1 * interval/10
-		self.r_comp = 1000
+		self.r_on   = -1 * interval
+		self.r_off  = 1 * interval/10
+		self.r_comp = 100
 
 		# epsilon-greedy
 		self.epsilon = 0.2
 		self.normal  = 0.0
 
 		# log
-		self.logf = open('q_logs_'+MODE+'.txt', 'a')
+		self.logf = open('Qlogs/q_logs_'+MODE+str(Qloop)+'.txt', 'a')
 
 
 	def initializeQ(self):
-		# accumulation Q[action][Slevel]
+		# snow accumulation Q[action][Srank]
 		if( self.MODE == 'S' ):
 			Qtable = np.zeros((2, 7))
 
-		# snow accumulation and temperature Q[action][Slevel][Tlevel]
+		# snow accumulation and temperature Q[action][Srank][Trank]
 		elif( self.MODE == 'ST' ):
 			Qtable = np.zeros(((2, 7, 6)))
 
-		# precipitation Q[action][Plevel]
+		# precipitation Q[action][Prank]
 		elif( self.MODE == 'P' ):
 			Qtable = np.zeros((2, 5))
 
-		# temperature and Precipitation Q[action][Tlevel][Plevel]
+		# temperature and Precipitation Q[action][Trank][Prank]
 		elif( self.MODE == 'TP' ):
 			Qtable = np.zeros(((2, 6, 5)))
 
-		# snow accumulation and precipitation Q[action][Slevel][Plevel]
+		# snow accumulation and precipitation Q[action][Srank][Prank]
 		elif( self.MODE=='SP' ):
 			Qtable = np.zeros(((2, 7, 5)))
+
+		# continuously operating time Q[action][ONtime]
+		elif( self.MODE=='C' ):
+			Qtable = np.zeros((2, 5))
+
+		# snow accumulation & continuously operating time
+		# Q[action][Srank][Crank]
+		elif( self.MODE=='SC' ):
+			Qtable = np.zeros(((2, 7, 5)))
+
+		# precipitation and continuously operating time Q[action][Plevel][Clevel]
+		elif( self.MODE=='PC' ):
+			Qtable = np.zeros(((2, 5, 5)))
 
 		# invalid MODE
 		else:
@@ -86,51 +100,60 @@ class Qlearning:
 		return Qtable, comp
 
 
-	def Tlevel(self, temp):
-		if( temp < -6 ):	Tlevel = 0
-		elif( temp < -3 ):	Tlevel = 1
-		elif( temp < 0 ):	Tlevel = 2
-		elif( temp < 3 ):	Tlevel = 3
-		elif( temp < 6 ):	Tlevel = 4
-		else:				Tlevel = 5
-		return Tlevel
+	def Trank(self, temp):
+		if( temp < -6 ):	Trank = 0
+		elif( temp < -3 ):	Trank = 1
+		elif( temp < 0 ):	Trank = 2
+		elif( temp < 3 ):	Trank = 3
+		elif( temp < 6 ):	Trank = 4
+		else:				Trank = 5
+		return Trank
 
 
-	def Slevel(self, snow):
+	def Srank(self, snow):
 		if( snow < 0 ):
 			print('invalid value of snow accumulation')
 			sys.exit()
-		elif( snow < 0.03 ):	Slevel = 0
-		elif( snow < 0.05 ):	Slevel = 1
-		elif( snow < 0.1 ) :	Slevel = 2
-		elif( snow < 0.2 ) :	Slevel = 3
-		elif( snow < 0.3 ) :	Slevel = 4
-		elif( snow < 0.5 ) :	Slevel = 5
-		else:					Slevel = 6
-		return Slevel
+		elif( snow < 0.03 ):	Srank = 0
+		elif( snow < 0.05 ):	Srank = 1
+		elif( snow < 0.1 ) :	Srank = 2
+		elif( snow < 0.2 ) :	Srank = 3
+		elif( snow < 0.4 ) :	Srank = 4
+		elif( snow < 0.7 ) :	Srank = 5
+		else:					Srank = 6
+		return Srank
 
-	def Plevel(self, pre):
+	def Prank(self, pre):
 		if( pre < 0 ):
 			print('invalid value of snow accumulation')
 			sys.exit()
-		elif( pre == 0 ):	Plevel = 0
-		elif( pre < 0.01 ):	Plevel = 1
-		elif( pre < 0.02 ):	Plevel = 2
-		elif( pre < 0.03 ):	Plevel = 3
-		else:				Plevel = 4
-		return Plevel
+		elif( pre == 0 ):	Prank = 0
+		elif( pre < 0.01 ):	Prank = 1
+		elif( pre < 0.02 ):	Prank = 2
+		elif( pre < 0.03 ):	Prank = 3
+		else:				Prank = 4
+		return Prank
+
+	
+	def Crank(self, onT):
+		if( onT == 0 ):		Crank = 0
+		elif( onT < 10 ):	Crank = 1
+		elif( onT < 20 ):	Crank = 2
+		elif( onT < 30 ):	Crank = 3
+		else:				Crank = 4
+		return Crank
 
 
-	def nextMax_S(self, Q, eachSLv):
-		if( Q[1][eachSLv] > Q[0][eachSLv] ):
-			return Q[1][eachSLv]
+	def nextMax_S(self, Q, eachSr):
+		if( Q[1][eachSr] > Q[0][eachSr] ):
+			return Q[1][eachSr]
 		else:
-			return Q[0][eachSLv]
+			return Q[0][eachSr]
 
 
-	def updateQ_S(self, Q, comp, heater, Slevel, onSLv, offSLv):
+	def updateQ_S(self, Q, comp, heater, Srank, onSr, offSr):
 		reward = 0
-		if(Slevel<=2):
+		if(Srank<=1):
 			if(comp==False):
 				reward += self.r_comp
 			comp = True
@@ -139,28 +162,29 @@ class Qlearning:
 
 		if(heater==1):
 			reward += self.r_on
-			nextMax = self.nextMax_S(Q, onSLv)
-			Q[1][Slevel] = (1-self.alpha) * Q[1][Slevel] \
+			nextMax = self.nextMax_S(Q, onSr)
+			Q[1][Srank] = (1-self.alpha) * Q[1][Srank] \
 							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Slevel] = '{:.5f}' .format(Q[1][Slevel])
+			Q[1][Srank] = '{:.5f}' .format(Q[1][Srank])
 		else:
-			nextMax = self.nextMax_S(Q, offSLv)
-			Q[0][Slevel] = (1-self.alpha) * Q[0][Slevel] \
+			reward += self.r_off
+			nextMax = self.nextMax_S(Q, offSr)
+			Q[0][Srank] = (1-self.alpha) * Q[0][Srank] \
 							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Slevel] = '{:.5f}' .format(Q[0][Slevel])
+			Q[0][Srank] = '{:.5f}' .format(Q[0][Srank])
 		return Q, comp
 
 
-	def nextMax_ST(self, Q, eachSLv, nextTLv):
-		if( Q[1][eachSLv][nextTLv] > Q[0][eachSLv][nextTLv] ):
-			return Q[1][eachSLv][nextTLv]
+	def nextMax_ST(self, Q, eachSr, nextTr):
+		if( Q[1][eachSr][nextTr] > Q[0][eachSr][nextTr] ):
+			return Q[1][eachSr][nextTr]
 		else:
-			return Q[0][eachSLv][nextTLv]
+			return Q[0][eachSr][nextTr]
 
 
-	def updateQ_ST(self, Q, comp, heater, Slevel, Tlevel, onSLv, offSLv, nextTLv):
+	def updateQ_ST(self, Q, comp, heater, Srank, Trank, onSr, offSr, nextTr):
 		reward = 0
-		if(Slevel<=2):
+		if(Srank<=1):
 			if(comp==False):
 				reward += self.r_comp
 			comp = True
@@ -169,86 +193,59 @@ class Qlearning:
 
 		if(heater==1):
 			reward += self.r_on
-			nextMax = self.nextMax_ST(Q, onSLv, nextTLv)
-			Q[1][Slevel][Tlevel] = (1-self.alpha) * Q[1][Slevel][Tlevel] \
+			nextMax = self.nextMax_ST(Q, onSr, nextTr)
+			Q[1][Srank][Trank] = (1-self.alpha) * Q[1][Srank][Trank] \
 								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Slevel][Tlevel] = '{:.3f}' .format(Q[1][Slevel][Tlevel])
+			Q[1][Srank][Trank] = '{:.3f}' .format(Q[1][Srank][Trank])
 		else:
-			nextMax = self.nextMax_ST(Q, offSLv, nextTLv)
-			Q[0][Slevel][Tlevel] = (1-self.alpha) * Q[0][Slevel][Tlevel] \
+			reward += self.r_off
+			nextMax = self.nextMax_ST(Q, offSr, nextTr)
+			Q[0][Srank][Trank] = (1-self.alpha) * Q[0][Srank][Trank] \
 								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Slevel][Tlevel] = '{:.3f}' .format(Q[0][Slevel][Tlevel])
+			Q[0][Srank][Trank] = '{:.3f}' .format(Q[0][Srank][Trank])
 		return Q, comp
 
 
-	def nextMax_P(self, Q, nextPLv):
-		if( Q[1][nextPLv] > Q[0][nextPLv] ):
-			return Q[1][nextPLv]
+	def nextMax_P(self, Q, nextPr):
+		if( Q[1][nextPr] > Q[0][nextPr] ):
+			return Q[1][nextPr]
 		else:
-			return Q[0][nextPLv]
+			return Q[0][nextPr]
 
 
-	def updateQ_P(self, Q, comp, heater, Slevel, Plevel, nextPLv):
+	def updateQ_P(self, Q, comp, heater, Srank, Prank, nextPr):
 		reward = 0
-		if(Slevel<=2):
+		if(Srank<=1):
 			if(comp==False):
 				reward += self.r_comp
 			comp = True
 		else:
 			comp = False
 
-		nextMax = self.nextMax_P(Q, nextPLv)
+		nextMax = self.nextMax_P(Q, nextPr)
 		if(heater==1):
 			reward += self.r_on
-			Q[1][Plevel] = (1-self.alpha) * Q[1][Plevel]\
+			Q[1][Prank] = (1-self.alpha) * Q[1][Prank]\
 							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Plevel] = '{:.5f}' .format(Q[1][Plevel])
+			Q[1][Prank] = '{:.5f}' .format(Q[1][Prank])
 		else:
-			Q[0][Plevel] = (1-self.alpha) * Q[0][Plevel]\
+			reward += self.r_off
+			Q[0][Prank] = (1-self.alpha) * Q[0][Prank]\
 							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Plevel] = '{:.5f}' .format(Q[0][Plevel])
+			Q[0][Prank] = '{:.5f}' .format(Q[0][Prank])
 		return Q, comp
 
 
-	def nextMax_TP(self, Q, nextTLv, nextPLv):
-		if( Q[1][nextTLv][nextPLv] > Q[0][nextTLv][nextPLv] ):
-			return Q[1][nextTLv][nextPLv]
+	def nextMax_C(self, Q, nextCr):
+		if( Q[1][nextCr] > Q[0][nextCr] ):
+			return Q[1][nextCr]
 		else:
-			return Q[0][nextTLv][nextPLv]
+			return Q[0][nextCr]
 
 
-	def updateQ_TP(self, Q, comp, heater, Slevel, Tlevel, Plevel, nextTLv, nextPLv):
+	def updateQ_C(self, Q, comp, heater, Srank, Crank, onCr, offCr):
 		reward = 0
-		if(Slevel<=2):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			comp = False
-
-		nextMax = self.nextMax_TP(Q, nextTLv, nextPLv)
-		if(heater==1):
-			reward += self.r_on
-			Q[1][Tlevel][Plevel] = (1-self.alpha) * Q[1][Tlevel][Plevel]\
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Tlevel][Plevel] = '{:.3f}' .format(Q[1][Tlevel][Plevel])
-		else:
-			Q[0][Tlevel][Plevel] = (1-self.alpha) * Q[0][Tlevel][Plevel]\
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Tlevel][Plevel] = '{:.3f}' .format(Q[0][Tlevel][Plevel])
-		return Q, comp
-
-
-	def nextMax_SP(self, Q, eachSLv, nextPLv):
-		if( Q[1][eachSLv][nextPLv] > Q[0][eachSLv][nextPLv] ):
-			return Q[1][eachSLv][nextPLv]
-		else:
-			return Q[0][eachSLv][nextPLv]
-
-
-	def updateQ_SP(self, Q, comp, heater, Slevel, Plevel, onSLv, offSLv, nextPLv):
-		reward = 0
-		if(Slevel<=2):
+		if(Srank<=1):
 			if(comp==False):
 				reward += self.r_comp
 			comp = True
@@ -257,100 +254,271 @@ class Qlearning:
 
 		if(heater==1):
 			reward += self.r_on
-			nextMax = self.nextMax_SP(Q, onSLv, nextPLv)
-			Q[1][Slevel][Plevel] = (1-self.alpha) * Q[1][Slevel][Plevel] \
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Slevel][Plevel] = '{:.3f}' .format(Q[1][Slevel][Plevel])
+			nextMax = self.nextMax_C(Q, onCr)
+			Q[1][Crank] = (1-self.alpha) * Q[1][Crank] \
+							+ self.alpha * (reward + self.gamma*nextMax)
+			Q[1][Crank] = '{:.5f}' .format(Q[1][Crank])
 		else:
-			nextMax = self.nextMax_SP(Q, offSLv, nextPLv)
-			Q[0][Slevel][Plevel] = (1-self.alpha) * Q[0][Slevel][Plevel] \
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Slevel][Plevel] = '{:.3f}' .format(Q[0][Slevel][Plevel])
+			reward += self.r_off
+			nextMax = self.nextMax_C(Q, offCr)
+			Q[0][Crank] = (1-self.alpha) * Q[0][Crank] \
+							+ self.alpha * (reward + self.gamma*nextMax)
+			Q[0][Crank] = '{:.5f}' .format(Q[0][Crank])
 		return Q, comp
 
 
-	def random_act(self, rand, Slevel):
+	def nextMax_TP(self, Q, nextTr, nextPr):
+		if( Q[1][nextTr][nextPr] > Q[0][nextTr][nextPr] ):
+			return Q[1][nextTr][nextPr]
+		else:
+			return Q[0][nextTr][nextPr]
+
+
+	def updateQ_TP(self, Q, comp, heater, Srank, Trank, Prank, nextTr, nextPr):
+		reward = 0
+		if(Srank<=1):
+			if(comp==False):
+				reward += self.r_comp
+			comp = True
+		else:
+			comp = False
+
+		nextMax = self.nextMax_TP(Q, nextTr, nextPr)
+		if(heater==1):
+			reward += self.r_on
+			Q[1][Trank][Prank] = (1-self.alpha) * Q[1][Trank][Prank]\
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[1][Trank][Prank] = '{:.3f}' .format(Q[1][Trank][Prank])
+		else:
+			reward += self.r_off
+			Q[0][Trank][Prank] = (1-self.alpha) * Q[0][Trank][Prank]\
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[0][Trank][Prank] = '{:.3f}' .format(Q[0][Trank][Prank])
+		return Q, comp
+
+
+	def nextMax_SP(self, Q, eachSr, nextPr):
+		if( Q[1][eachSr][nextPr] > Q[0][eachSr][nextPr] ):
+			return Q[1][eachSr][nextPr]
+		else:
+			return Q[0][eachSr][nextPr]
+
+
+	def updateQ_SP(self, Q, comp, heater, Srank, Prank, onSr, offSr, nextPr):
+		reward = 0
+		if(Srank<=1):
+			if(comp==False):
+				reward += self.r_comp
+			comp = True
+		else:
+			comp = False
+
+		if(heater==1):
+			reward += self.r_on
+			nextMax = self.nextMax_SP(Q, onSr, nextPr)
+			Q[1][Srank][Prank] = (1-self.alpha) * Q[1][Srank][Prank] \
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[1][Srank][Prank] = '{:.3f}' .format(Q[1][Srank][Prank])
+		else:
+			reward += self.r_off
+			nextMax = self.nextMax_SP(Q, offSr, nextPr)
+			Q[0][Srank][Prank] = (1-self.alpha) * Q[0][Srank][Prank] \
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[0][Srank][Prank] = '{:.3f}' .format(Q[0][Srank][Prank])
+		return Q, comp
+
+
+	def nextMax_SC(self, Q, eachSr, eachCr):
+		if( Q[1][eachSr][eachCr] > Q[0][eachSr][eachCr] ):
+			return Q[1][eachSr][eachCr]
+		else:
+			return Q[0][eachSr][eachCr]
+
+
+	def updateQ_SC(self, Q, comp, heater, Srank, Crank,\
+					onSr, offSr, onCr, offCr):
+		reward = 0
+		if(Srank<=1):
+			if(comp==False):
+				reward += self.r_comp
+			else:
+				comp = True
+		else:
+			comp = False
+
+		if(heater==1):
+			reward += self.r_on
+			nextMax = self.nextMax_SC(Q, onSr, onCr)
+			Q[1][Srank][Crank] = (1-self.alpha) * Q[1][Srank][Crank]\
+									+ self.alpha * (reward + self.gamma*nextMax)
+			Q[1][Srank][Crank] = '{:.3f}' .format(Q[1][Srank][Crank])
+		else:
+			reward += self.r_off
+			nextMax = self.nextMax_SC(Q, offSr, offCr)
+			Q[0][Srank][Crank] = (1-self.alpha) * Q[0][Srank][Crank]\
+									+ self.alpha * (reward + self.gamma*nextMax)
+			Q[0][Srank][Crank] = '{:.3f}' .format(Q[0][Srank][Crank])
+		return Q, comp
+
+
+	def nextMax_PC(self, Q, nextPr, nextCr):
+		if( Q[1][nextPr][nextCr] > Q[0][nextPr][nextCr] ):
+			return Q[1][nextPr][nextCr]
+		else:
+			return Q[0][nextPr][nextCr]
+
+
+	def updateQ_PC(self, Q, comp, heater, Srank, Prank, Crank, nextPr, onCr, offCr):
+		reward = 0
+		if(Srank<=1):
+			if(comp==False):
+				reward += self.r_comp
+			comp = True
+		else:
+			comp = False
+
+		if(heater==1):
+			nextMax = self.nextMax_PC(Q, nextPr, onCr)
+			reward += self.r_on
+			Q[1][Prank][Crank] = (1-self.alpha) * Q[1][Prank][Crank]\
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[1][Prank][Crank] = '{:.3f}' .format(Q[1][Prank][Crank])
+		else:
+			reward += self.r_off
+			nextMax = self.nextMax_PC(Q, nextPr, offCr)
+			Q[0][Prank][Crank] = (1-self.alpha) * Q[0][Prank][Crank]\
+								+ self.alpha * (reward + self.gamma*nextMax)
+			Q[0][Prank][Crank] = '{:.3f}' .format(Q[0][Prank][Crank])
+		return Q, comp
+
+
+	def random_act(self, rand, Srank):
 		if( rand <= (self.epsilon+self.normal) and rand > self.epsilon ):
-			self.logf.write(',\tnormal, ')
-			if(Slevel<=2):		act = 0
+			self.logf.write(',\tnormal,')
+			if(Srank<=1):		act = 0
 			else:				act = 1
 		else:
-			self.logf.write(',\trandom, ')
+			self.logf.write(',\trandom,')
 			act = random.choice(action)
 		return act
 
 
-	def select_act_S(self, Q, Slevel, onSLv, offSLv):
+	def select_act_S(self, Q, Srank):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
-			if( Q[1][onSLv] > Q[0][offSLv] ):
-				self.logf.write(',\tnormal, ')
+			if( Q[1][Srank] > Q[0][Srank] ):
+				self.logf.write(',\tnormal,')
 				act = 1
 			else:
-				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal,')
 				act = 0
 		else:
-			act = self.random_act(rand, Slevel)
+			act = self.random_act(rand, Srank)
 		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 
-	def select_act_ST(self, Q, Slevel, Tlevel, onSLv, offSLv, nextTLv):
+	def select_act_ST(self, Q, Srank, Trank):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
-			if( Q[1][Slevel][Tlevel] > Q[0][Slevel][Tlevel] ):
-				self.logf.write(',\tnormal, ')
+			if( Q[1][Srank][Trank] > Q[0][Srank][Trank] ):
+				self.logf.write(',\tnormal,')
 				act = 1
 			else:
-				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal,')
 				act = 0
 		else:
-			act = self.random_act(rand, Slevel)
+			act = self.random_act(rand, Srank)
 		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 
-	def select_act_P(self, Q, Slevel, Plevel, nextPLv):
+	def select_act_P(self, Q, Srank, Prank):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
-			if( Q[1][Plevel] > Q[0][Plevel] ):
-				self.logf.write(',\tnormal, ')
+			if( Q[1][Prank] > Q[0][Prank] ):
+				self.logf.write(',\tnormal,')
 				act = 1
 			else:
-				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal,')
 				act = 0
 		else:
-			act = self.random_act(rand, Slevel)
+			act = self.random_act(rand, Srank)
 		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 
-	def select_act_TP(self, Q, Slevel, Tlevel, Plevel, nextTLv, nextPLv):
+	def select_act_TP(self, Q, Srank, Trank, Prank):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
-			if( Q[1][Tlevel][Plevel] > Q[0][Tlevel][Plevel] ):
-				self.logf.write(',\tnormal, ')
+			if( Q[1][Trank][Prank] > Q[0][Trank][Prank] ):
+				self.logf.write(',\tnormal,')
 				act = 1
 			else:
-				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal,')
 				act = 0
 		else:
-			act = self.random_act(rand, Slevel)
+			act = self.random_act(rand, Srank)
 		self.logf.write('\t'+str(act)+',\t')
 		return act
 
 
-	def select_act_SP(self, Q, Slevel, Plevel, onSLv, offSLv, nextPLv):
+	def select_act_SP(self, Q, Srank, Prank):
 		rand = random.random()
 		if( rand > (self.epsilon+self.normal) ):
-			if( Q[1][Slevel][Plevel] > Q[0][Slevel][Plevel] ):
-				self.logf.write(',\tnormal, ')
+			if( Q[1][Srank][Prank] > Q[0][Srank][Prank] ):
+				self.logf.write(',\tnormal,')
 				act = 1
 			else:
-				self.logf.write(',\tnormal, ')
+				self.logf.write(',\tnormal,')
 				act = 0
 		else:
-			act = self.random_act(rand, Slevel)
+			act = self.random_act(rand, Srank)
+		self.logf.write('\t'+str(act)+',\t')
+		return act
+
+
+	def select_act_C(self, Q, Srank, Crank, onCr, offCr):
+		rand = random.random()
+		if( rand > (self.epsilon+self.normal) ):
+			if( Q[1][Crank] > Q[0][Crank] ):
+				self.logf.write(',\tnormal,')
+				act = 1
+			else:
+				self.logf.write(',\tnormal,')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
+		self.logf.write('\t'+str(act)+',\t')
+		return act
+
+
+	def select_act_SC(self, Q, Srank, Crank):
+		rand = random.random()
+		if( rand > (self.epsilon+self.normal) ):
+			if( Q[1][Srank][Crank] > Q[0][Srank][Crank] ):
+				self.logf.write(',\tnormal,')
+				act = 1
+			else:
+				self.logf.write(',\tnormal,')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
+		self.logf.write('\t'+str(act)+',\t')
+		return act
+
+
+	def select_act_PC(self, Q, Srank, Prank, Crank):
+		rand = random.random()
+		if( rand > (self.epsilon+self.normal) ):
+			if( Q[1][Prank][Crank] > Q[0][Prank][Crank] ):
+				self.logf.write(',\tnormal,')
+				act = 1
+			else:
+				self.logf.write(',\tnormal,')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
 		self.logf.write('\t'+str(act)+',\t')
 		return act
 
@@ -399,7 +567,6 @@ if __name__ == '__main__':
 					if( Q[state[0]][state[1]][3]>Qmax and state[0]>0 ):
 						Qmax = Q[state[0]][state[1]][3]
 						act = 'west'
-
 				else:
 					del_list = []
 					if( state[1]>=3 ):

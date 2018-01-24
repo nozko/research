@@ -18,6 +18,7 @@ import q_control
 
 
 interval  = 3			# [min] calculatioin interval
+
 CK        = 1.0			# 緩和係数(0.7~1.5程度)
 maxT      = 70			# [℃ ] maximum temperature of heat source
 maxPene   = 0.05		# [m] maximum penetration height of water
@@ -49,7 +50,7 @@ class sim:
 
 	def __init__(self):
 		self.net = open('file.net', 'r')
-		self.logf = open('logs_'+str(interval)+'.csv', 'a')
+		self.logf = open('logs/logs_'+str(interval)+'.csv', 'a')
 
 		self.control = q_control.control()
 
@@ -132,8 +133,8 @@ if __name__ == '__main__':
 	parser.add_argument('weather')
 	args = parser.parse_args()
 
-	if(os.path.exists('logs_'+str(interval)+'.csv')):
-		os.remove('logs_'+str(interval)+'.csv')
+	if(os.path.exists('logs/logs_'+str(interval)+'.csv')):
+		os.remove('logs/logs_'+str(interval)+'.csv')
 	sim().logf.write('date, temperature, precipitation, snow accumulate, switch')
 
 	snow_minusT = 0
@@ -208,7 +209,7 @@ if __name__ == '__main__':
 				day_cnt += 1
 				print('\n----- day', day_cnt, '-----')
 				sim().logf.write('\n----- day ' + str(day_cnt) + ' -----\n')
-				time.sleep(0.8)
+				time.sleep(0.5)
 			day_1 = day
 
 			sun = sun/4.186*1000		# [kcal/m^2]
@@ -217,9 +218,6 @@ if __name__ == '__main__':
 			absH, nightR = sim().absoluteHumid(vaporP, cloud, temp_o, nightR)
 
 			oldmin = minute//10
-
-			sim().logf.write(str(date) + ', ')
-
 
 		print('\n'+str(date), '\ttemperature :',temp_o,'℃ ', \
 				'\tprecipitation :',pre, '[mm/min]')
@@ -467,9 +465,13 @@ if __name__ == '__main__':
 
 		BT = T
 
-		sim().logf.write(str(temp_o)+', ')
-		sim().logf.write(str(pre)+', ')
-		sim().logf.write(str(snow)+', ')
+		str_snow = '{:.3f}' .format(snow)
+		sim().logf.write('{},{:>5}, {:.3f},{:>6}, '
+						.format(date, temp_o, pre, str_snow))
+#		sim().logf.write(str(date) + ', ')
+#		sim().logf.write(str(temp_o)+', ')
+#		sim().logf.write(str(pre)+', ')
+#		sim().logf.write(str(snow)+', ')
 
 		Tsnow_off = ntime[0][0] * interval
 		Tsnow_on  = ntime[1][0] * interval
@@ -485,7 +487,7 @@ if __name__ == '__main__':
 			sim().logf.write('on\n')
 
 		date = date + datetime.timedelta(minutes=interval)
-		time.sleep(0.3)
+#		time.sleep(0.3)
 
 
 	onT         = onT * interval			# [min]
