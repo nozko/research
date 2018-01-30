@@ -2,12 +2,20 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-from datetime import datetime
+import datetime
 import argparse
 import sys
 import numpy as np
 import random
 import time
+
+# time list of start long snowing
+ssList = open('ssList.txt', 'r').readlines()
+start_list = []
+for ss in ssList:
+	st = ss.split('\n')[0]
+	start_list.append(datetime.datetime.strptime(st, '%Y-%m-%d %H:%M'))
+
 
 
 class control:
@@ -39,7 +47,7 @@ class control:
 
 
 	# melt after the snowing stops
-	def judge_orig1(self, pre, snow):
+	def original1(self, pre, snow):
 		if( snow < 0.2 ):
 			heater = 0
 		elif( pre > 0.0 ):
@@ -50,7 +58,7 @@ class control:
 
 
 	# keep the road temperature above 0
-	def judge_orig2_0(self, TS):
+	def orignal2_0(self, TS):
 		if( TS < 0 ):
 			heater = 1
 		else:
@@ -59,7 +67,7 @@ class control:
 
 
 	# keep the road temperature above 10
-	def judge_orig2_1(self, TS):
+	def original2_1(self, TS):
 		if( TS < 10 ):
 			heater = 1
 		else:
@@ -68,11 +76,56 @@ class control:
 
 
 	# keep the road temperature above 0  version.2
-	def judge_orig3(self, TS, snow):
+	def original2_2(self, TS, snow):
 		if( (TS < 0) or (snow >= 0.2) ):
 			heater = 1
 		else:
 			heater = 0
+		return heater
+
+
+	# start warming up the road before snow falls continuously
+	def original3(self, date, snow, TS):
+		for start in start_list:
+			back = start - datetime.timedelta(minutes=20)
+			if( date>=back and date<=start and TS<60 ):
+				heater = 1
+				break
+			else:
+				heater = 0
+		if( snow >= 0.2 ):
+			heater = 1
+		return heater
+
+
+	# switch on and off at fixed time while snowing
+	def original4_0(self, onT, offT, pre, heater):
+		if( pre > 0.0 ):
+			if( offT >= 10.0 ):
+				heater = 1
+			elif( onT >= 10.0 ):
+				heater = 0
+			elif( onT==0 and offT==0 ):
+				heater = 1
+		else:
+			heater = 0
+		return heater
+
+
+	# switch on/off at fixed time while snowing and melt all snow after snow stops
+	def original4_1(self, onT, offT, pre, heater, snow):
+		if( pre > 0.0 ):
+			if( offT >= 10.0 ):
+				heater = 1
+			elif( onT >= 10.0 ):
+				heater = 0
+			elif( onT==0 and offT==0 ):
+				heater = 1
+		else:
+			if( snow >= 0.2 ):
+				heater = 1
+			else:
+				heater = 0
 		return heater
 
 

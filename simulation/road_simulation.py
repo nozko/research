@@ -48,7 +48,7 @@ class sim:
 
 	def __init__(self):
 		self.net = open('file.net', 'r')
-		self.logf = open('logs/logs_'+str(interval)+mode+'.csv', 'a')
+		self.logf = open('logs/logs_'+str(interval)+'_'+mode+'.csv', 'a')
 
 		self.control = q_control.control()
 
@@ -129,21 +129,30 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='calculation interval')
 	parser.add_argument('interval', help='0~10[min]')
-	parser.add_argument('mode', help='p, s, on, off, orig1, orig2.0, orig2.1 or orig3')
+	parser.add_argument('mode', help='p, s, on, off, 1, 2.0, 2.1, 2.2, 3,\
+									4.0 or 4.1')
 	args = parser.parse_args()
 
 	global interval, mode
 	interval = float(args.interval)
 	mode     = args.mode
+	# mode p     : judge from precipitation
+	# mode s     : judge from snow accumulation
+	# mode on    : always on
+	# mode off   : always off
+	# mode orig1 : melt after the snowing stops
+	# mode orig2 : keep the road temperature above 0(2.0) or 10(2.1)
+	# mode orig3 : start warming up the road before snow falls continuously
 	print('interval : {}[min]\tmode : {}' .format(interval, mode))
 
-	if(mode!='p' and mode!='s' and mode!='on' and mode!='off' and mode!='orig1'\
-			and mode!='orig2.0' and mode!='orig2.1' and mode!='orig3'):
+	if(mode!='p' and mode!='s' and mode!='on' and mode!='off' and mode!='1'\
+			and mode!='2.0' and mode!='2.1' and mode!='2.2' and mode!='3'\
+			and mode!='4.0' and mode!='4.1'):
 		print('invalid mode error')
 		sys.exit()
 
-	if(os.path.exists('logs/logs_'+str(interval)+mode+'.csv')):
-		os.remove('logs/logs_'+str(interval)+mode+'.csv')
+	if(os.path.exists('logs/logs_'+str(interval)+'_'+mode+'.csv')):
+		os.remove('logs/logs_'+str(interval)+'_'+mode+'.csv')
 	sim().logf.write('date, temperature, precipitation, snow accumulate, TS, melt, switch')
 
 	snow_minusT = 0
@@ -153,6 +162,7 @@ if __name__ == '__main__':
 	temp_o = 0		# temperature outside
 	Qsup   = 0		# supplied Q
 	onT    = 0		# operating time
+	offT   = 0
 	onSum  = 0
 	heater = 0		# on(1) / off(0)
 	noPreT = 0		# no precipitation time
@@ -182,12 +192,15 @@ if __name__ == '__main__':
 	data_cnt = 0
 
 	data1 = all_data[1].split(', ')
+	year   = data1[0]
 	month  = int(data1[1])
 	day    = data1[2]
 	Hour   = data1[3]
 	minute = int(data1[4])
-	date = '2017-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
+	date = year+'-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
 	date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
+
+	TS = 6
 
 	oldmin = -1
 
@@ -225,7 +238,7 @@ if __name__ == '__main__':
 				if(day != day_1):
 					day_cnt += 1
 					sim().logf.write('\n-----\n')
-					time.sleep(0.5)
+#					time.sleep(0.5)
 				day_1 = day
 
 				sun = sun/4.186*1000		# [kcal/m^2]
@@ -281,20 +294,30 @@ if __name__ == '__main__':
 					heater = sim().control.judge_p(pre)
 				elif(mode=='s'):
 					heater = sim().control.judge_s(snow)
-				elif(mode=='orig1'):
-					heater = sim().control.judge_orig1(pre, snow)
-				elif(mode=='orig2.0'):
-					heater = sim().control.judge_orig2_0(TS)
-				elif(mode=='orig2.1'):
-					heater = sim().control.judge_orig2_1(TS)
+				elif(mode=='1'):
+					heater = sim().control.original1(pre, snow)
+				elif(mode=='2.0'):
+					heater = sim().control.original2_0(TS)
+				elif(mode=='2.1'):
+					heater = sim().control.original2_1(TS)
+				elif(mode=='2.2'):
+					heater = sim().control.original2_1(TS, snow)
+				elif(mode=='3'):
+					heater = sim().control.original3(date, snow, TS)
+				elif(mode=='4.0'):
+					heater = sim().control.original4_0(onT, offT, pre, heater)
+				elif(mode=='4.1'):
+					heater = sim().control.original4_1(onT,offT,pre,heater,snow)
 
 				ntime[heater][level] += 1
 
 			if(heater==1):
 				onT += interval
+				offT = 0
 				onSum += interval
 			else:
 				onT = 0
+				offT += interval
 
 			E = 0
 			NC = 0
