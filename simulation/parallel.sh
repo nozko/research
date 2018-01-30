@@ -1,3 +1,3 @@
 #!/bin/sh
 
-cat learn.sh | xargs -P4 -I{} -t bash -c '{}'
+cat learn.sh | xargs -P7 -I{} -t bash -c '{}'
