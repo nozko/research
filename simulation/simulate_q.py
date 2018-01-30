@@ -35,10 +35,10 @@ fn1.close()
 fn2 = open('file.net', 'r')
 net = re.split(" +", fn2.readlines()[4])
 npn = int(net[1])
-HR  = []
+HR = []
 for j in range(npn):
 	target_line = linecache.getline('file.net', 6+j)
-	netj = re.split(" +", target_line)
+	netj = re.split( " +", target_line)
 	HR.append(float(netj[3]))
 fn2.close()
 linecache.clearcache()
@@ -47,8 +47,8 @@ linecache.clearcache()
 class sim:
 
 	def __init__(self):
-		self.net = open('file.net', 'r')
-		self.logf = open('logs/logs_'+str(interval)+mode+'.csv', 'a')
+		self.net  = open('file.net', 'r')
+		self.slogf = open('Qlogs/useQ_log_'+MODE+str(interval)+'.csv', 'a')
 
 		self.control = q_control.control()
 
@@ -125,79 +125,110 @@ class sim:
 
 
 
+class QL:
+	
+	def __init__(self):
+		alpha = 0.01
+		gamma = 0.9
+		self.Qlearn = q_control.Qlearning(MODE, 1, alpha, gamma, interval)
+		
+		self.result = 'Qlogs/result_'+MODE+'.csv'
+
+
+
 if __name__ == '__main__':
 
-	parser = argparse.ArgumentParser(description='calculation interval')
+	start = time.time()
+	print('start time :', time.ctime())
+
+	parser = argparse.ArgumentParser(description='MODE')
+	parser.add_argument('MODE', help='S, P, C, ST, TP, SC, PC, SP and SPC' )
 	parser.add_argument('interval', help='0~10[min]')
-	parser.add_argument('mode', help='p, s, on, off, orig1, orig2.0, orig2.1 or orig3')
 	args = parser.parse_args()
 
-	global interval, mode
+	global MODE
+	global interval
 	interval = float(args.interval)
-	mode     = args.mode
-	print('interval : {}[min]\tmode : {}' .format(interval, mode))
-
-	if(mode!='p' and mode!='s' and mode!='on' and mode!='off' and mode!='orig1'\
-			and mode!='orig2.0' and mode!='orig2.1' and mode!='orig3'):
-		print('invalid mode error')
+	MODE     = args.MODE
+	# MODE S : snow accumulation
+	# MODE T : temperature
+	# MODE P : precipitation
+	# MODE C : continuously operating time
+	if(MODE!='S' and MODE!='P' and MODE!='C' and MODE!='ST' and MODE!='TP'\
+			and MODE!='SP' and MODE!='SC' and MODE!='PC' and MODE!='SPC'):
+		print('!!! invalid MODE ERROR !!!')
 		sys.exit()
 
-	if(os.path.exists('logs/logs_'+str(interval)+mode+'.csv')):
-		os.remove('logs/logs_'+str(interval)+mode+'.csv')
-	sim().logf.write('date, temperature, precipitation, snow accumulate, TS, melt, switch')
+	if(os.path.exists('Qlogs/useQ_log_'+MODE+str(interval)+'.csv')):
+		os.remove('Qlogs/useQ_log_'+MODE+str(interval)+'.csv')
+
+	Qtable = np.loadtxt(QL().result)
+	print(Qtable)
 
 	snow_minusT = 0
 	wet_minusT  = 0
 
-	# initialize
-	temp_o = 0		# temperature outside
-	Qsup   = 0		# supplied Q
-	onT    = 0		# operating time
-	onSum  = 0
-	heater = 0		# on(1) / off(0)
-	noPreT = 0		# no precipitation time
-	lpmx   = 0
-	ntime  = np.zeros((2, 3))
-	Qr     = 0		# Q from surface(snowing, more than 0℃ )
+	print('interval :', interval, '[min]')
+	print('  MODE   :', MODE)
 
-	Qe    = 0
-	BF    = 0
-	Water = 0		# [kg/m^2]
-	Snow  = 0
-	ww    = 0		# [kg/m^2]
-	htr   = 0
-	sat   = 0		# 相当外気温 Sol-Air Temperature
-
-	snow   = 0.0	# [kg/m^2] snow mass
-	Scover = 0.0	# [m] snow volume
-	cover  = 0.0	# [m] snow volume
-
-	data     = open('sapporo2017.csv', 'r')
-	all_data = data.readlines()
-	data_num = len(all_data) - 1
-	data.close()
-
-	day_cnt  = 0
-	day_1    = 0
-	data_cnt = 0
-
-	data1 = all_data[1].split(', ')
-	month  = int(data1[1])
-	day    = data1[2]
-	Hour   = data1[3]
-	minute = int(data1[4])
-	date = '2017-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
-	date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
-
-	oldmin = -1
 
 
 	try:
+
+		# initialize
+		onT    = 0		# [min] operating time
+		temp_o = 0		# temperature outside
+		Qsup   = 0		# supplied Q
+		heater = 0		# on(1) / off(0)
+		noPreT = 0		# no precipitation time
+		lpmx   = 0
+		ntime  = np.zeros((2, 3))
+		Qr     = 0		# Q from surface(snowing, more than 0℃ )
+		Qe     = 0
+		BF     = 0
+		Water  = 0		# [kg/m^2]
+		Snow   = 0
+		ww     = 0		# [kg/m^2]
+		htr    = 0
+		sat    = 0		# 相当外気温 Sol-Air Temperature
+
+		snow   = 0.0	# [kg/m^2] snow mass
+		Scover = 0.0	# [m] snow volume
+		cover  = 0.0	# [m] snow volume
+
+		tset = 0
+
+		data     = open('sapporo2017.csv', 'r')
+		all_data = data.readlines()
+		data_num = len(all_data) - 1
+		data.close()
+
+		day_cnt  = 0
+		day_1    = 0
+		oldmin   = -1
+		data_cnt = 0
+
+
+		data1 = all_data[1].split(', ')
+		year   = data1[0]
+		month  = int(data1[1])
+		day    = data1[2]
+		Hour   = data1[3]
+		minute = int(data1[4])
+		date = year+'-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
+		date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
+
 		### interval loop ###
 		while( data_cnt < data_num-1 ):
+			if(day != day_1):
+				day_cnt += 1
+			day_1 = day
 
-			# next 10 minutes
-			if( (date.minute//10) != oldmin ):
+			shift = False
+
+			# next 10 minutes data
+			if( int(date.minute)//10 != oldmin ):
+				shift = True
 				data_cnt += 1
 				t0 = temp_o
 
@@ -220,20 +251,21 @@ if __name__ == '__main__':
 				if(all_data[data_cnt-1]=='blank\n'):
 					date = year+'-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
 					date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
-					sim().logf.write('\n')
-
-				if(day != day_1):
-					day_cnt += 1
-					sim().logf.write('\n-----\n')
-					time.sleep(0.5)
-				day_1 = day
+					sim().slogf.write('\nblank')
+					sim().slogf.close()
 
 				sun = sun/4.186*1000		# [kcal/m^2]
 
 				# absolute humidity, night R
-				absH, nightR = sim().absoluteHumid(vaporP, cloud, temp_o, nightR)
+				absH, nightR = sim().absoluteHumid(vaporP,cloud,temp_o,nightR)
 
 				oldmin = minute//10
+
+			elif( (int(date.minute)+interval)//10 != oldmin ):
+				shift = True
+
+			sim().slogf.write('\n' + str(date))
+			sim().slogf.close()
 
 			Wspeed = Wspeed0 * windC		# [m/sec] after ccorrection
 
@@ -272,32 +304,45 @@ if __name__ == '__main__':
 						level = 2
 
 
-				# decide on/off
-				if(mode=='on'):
-					heater = sim().control.on()
-				elif(mode=='off'):
-					heater = sim().control.off()
-				elif(mode=='p'):
-					heater = sim().control.judge_p(pre)
-				elif(mode=='s'):
-					heater = sim().control.judge_s(snow)
-				elif(mode=='orig1'):
-					heater = sim().control.judge_orig1(pre, snow)
-				elif(mode=='orig2.0'):
-					heater = sim().control.judge_orig2_0(TS)
-				elif(mode=='orig2.1'):
-					heater = sim().control.judge_orig2_1(TS)
+			""" Q """
+			# ranks
+			Srank = QL().Qlearn.Srank(snow)
+			if( MODE.find('T') >= 0 ):
+				Trank  = QL().Qlearn.Trank(temp_o)
+			if( MODE.find('P') >= 0 ):
+				Prank  = QL().Qlearn.Prank(pre)
+			if( MODE.find('C') >= 0 ):
+				Crank = QL().Qlearn.Crank(onT)
 
-				ntime[heater][level] += 1
+			# decide action
+			if( MODE == 'S' ):
+				heater = QL().Qlearn.select_act_S(Qtable, Srank)
+			elif( MODE == 'P' ):
+				heater = QL().Qlearn.select_act_P(Qtable, Srank, Prank)
+			elif( MODE == 'ST' ):
+				heater = QL().Qlearn.select_act_ST(Qtable, Srank, Trank)
+			elif( MODE == 'TP' ):
+				heater = QL().Qlearn.select_act_TP(Qtable, Srank, Trank, Prank)
+			elif( MODE == 'SP' ):
+				heater = QL().Qlearn.select_act_SP(Qtable, Srank, Prank)
+			elif( MODE == 'C' ):
+				heater = QL().Qlearn.select_act_C(Qtable, Srank, Crank)
+			elif( MODE == 'SC' ):
+				heater = QL().Qlearn.select_act_SC(Qtable, Srank, Crank)
+			elif( MODE == 'PC' ):
+				heater = QL().Qlearn.select_act_PC(Qtable, Srank, Prank, Crank)
+			elif( MODE == 'SPC' ):
+				heater = QL().Qlearn.select_act_SPC(Qtable,Srank,Prank,Crank)
 
-			if(heater==1):
-				onT += interval
-				onSum += interval
-			else:
-				onT = 0
 
-			E = 0
-			NC = 0
+			if(heater==1):	onT += interval
+			else:			onT = 0
+
+			ntime[heater][level] += 1
+
+	
+			E   = 0
+			NC  = 0
 			mlt = 0
 			ict = 0
 
@@ -311,7 +356,7 @@ if __name__ == '__main__':
 			else:
 				Q = 0
 
-
+	
 			# solar radiatioin absorption rate of snow
 			abrate = 0.8 - 30*cover
 			if(abrate < abrate0):	abrate = abrate0
@@ -321,23 +366,23 @@ if __name__ == '__main__':
 			sat = temp_o + (abrate*sun-0.9*nightR)/(sim().funa(Wspeed)+4)
 
 
-			# total water
-			wat = Water + rain_plus		# [kg/m^2]
-
-
-			TS  = BT			# たぶん路面温度
+			TS  = BT			# temperature(?)
 			# 路面に雪があるとき
 			if( (snow+snow_plus)>0 ):
 				if( TS>0 or sat>0 ):
 					mlt = 1
 			# 路面に水があるとき
-			if(wat > 0):
+			if( (Water+rain_plus)>0 ):
 				if( TS<0 ):
 					mlt = 1
 
 
 			# penetration height [m]
 			peneH = sim().penetration_height(cover, snow, Water)
+
+
+			# total water
+			wat = Water + rain_plus		# [kg/m^2]
 
 
 			melt  = 0
@@ -360,9 +405,8 @@ if __name__ == '__main__':
 				htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
 
 				# calc amount of snow melting
-#			melt = (200*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
 				melt = ((200*TS) + (htrm*sat) - (590*evaporate)) \
-							* (interval/60.0)/Hfusion*(1.0/85.0)
+							* (interval/60.0)/Hfusion * (1.0/85.0)
 				BF   = 1			# (?)
 
 				# 算出された融雪量が水分量より多い時
@@ -390,11 +434,8 @@ if __name__ == '__main__':
 			# snow accumulation (volume) [m]
 			if(Snow > 0):
 				if(melt > 0):
-#				Scover = Snow / (snow + snow_plus) \
-#							/ (cover + snow_plus/sfdens)
 					Scover = cover + snow_plus/sfdens - melt/916
 				else:
-#				Scover = cover + snow_plus/sfdens - melt/916
 					Scover = cover + snow_plus/sfdens
 			else:
 				Scover = 0
@@ -416,7 +457,7 @@ if __name__ == '__main__':
 					S2 = S2 + HR[j]*interval/60.0
 
 				tmp = (1-BF)*htr*sat
-				S1 = S1 + tmp*interval/60.0*area
+				S1 = S1 + ( tmp )*interval/60.0*area
 				S2 = S2 + (BF*200+(1-BF)*htr)*interval/60.0*area
 				if(ict==1):
 					E = (S2*tset - S1) / interval/60.0
@@ -426,10 +467,8 @@ if __name__ == '__main__':
 					aer = abs(ER)
 					if(aer > erx):
 						erx = aer
-						ier = 0
-					# 補正
 					if(CK*ER>3*interval):		T = 3*interval + T
-					elif(CK*ER<-3*interval):	T = T - 3*interval
+					elif(CK*ER<-3*interval):	T = -3*interval + T
 					else:						T = CK*ER + T
 
 				if(erx > 0.0001):
@@ -477,25 +516,25 @@ if __name__ == '__main__':
 
 			SE = E + Q + erot
 
-			if(SE > 0):		Qsup += SE
+			if(SE > 0):
+				Qsup += SE
 
 			if( pre>0.0 and T>0 ):
-				TS = T			# たぶん路面温度
+				TS = T
 				Qr_plus = BF*200*TS + (1-BF)*htr*(TS-sat)
 				Qr = Qr + (Qr_plus)*area
 
 			if( (Snow+pre)==0.0 and ww>0.0 ):
 				ww = 0.0		# [kg/m^2]
 			Water = ww			# [kg/m^2]
-			snow = Snow			# [kg/m^2]
-			cover = Scover			# [m]
+			snow  = Snow		# [kg/m^2]
+			sim().slogf.write('{:>5}℃\t' .format(temp_o))
+			sim().slogf.write('{}  +{:.2f}[kg/m^2]  ' .format(heater, snow_plus))
+			sim().slogf.write('-> {:.3f}[kg/m^2]' .format(snow))
+			sim().slogf.close()
+			cover = Scover		# [m]
 
 			BT = T
-
-			str_snow = '{:.3f}' .format(snow)
-			str_melt = '{:.3f}' .format(melt)
-			sim().logf.write('{},{:>5}, {:.3f},{:>7}, {:2d},{:>7}, '
-						.format(date, temp_o, pre, str_snow, int(TS), str_melt))
 
 			Tsnow_off = ntime[0][0] * interval
 			Tsnow_on  = ntime[1][0] * interval
@@ -503,16 +542,12 @@ if __name__ == '__main__':
 			Twet_on   = ntime[1][1] * interval
 			Tdry_off  = ntime[0][2] * interval
 			Tdry_on   = ntime[1][2] * interval
-			if(heater==0):
-				sim().logf.write('off\n')
-			else:
-				sim().logf.write('on\n')
-
-			date = date + datetime.timedelta(minutes=interval)
 
 			str_snow = '{:.3f}[kg/m^2]' .format(snow)
-			sys.stderr.write('\r{}{:>6}℃   {:.3f}[mm/min]  snow:{:>15}  {}'
-							.format(date, temp_o, pre, str_snow, heater))
+			sys.stderr.write('\r{} {:>6}℃   {:.3f}[mm/min] {:>15}  {}'
+					.format(date, temp_o, pre, str_snow, heater))
+
+			date = date + datetime.timedelta(minutes=interval)
 
 #			time.sleep(0.2)
 
@@ -523,13 +558,6 @@ if __name__ == '__main__':
 		Qsup        = Qsup * interval/60.0
 		Qr          = Qr * interval/60.0
 
-		Tsnow_off = ntime[0][0] * interval
-		Tsnow_on  = ntime[1][0] * interval
-		Twet_off  = ntime[0][1] * interval
-		Twet_on   = ntime[1][1] * interval
-		Tdry_off  = ntime[0][2] * interval
-		Tdry_on   = ntime[1][2] * interval
-
-		print('\ntotal operating time : {} [min]' .format(onSum))
-		sim().logf.write('total operating time : {} [min]' .format(onSum))
-		sim().logf.close()
+		time = time.time() - start
+		print("\ntime {:4d}:{:02d}" .format(int(time)//60, int(time)%60) )
+#		print('end time :', time.ctime())
