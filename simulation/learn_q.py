@@ -793,7 +793,7 @@ if __name__ == '__main__':
 		sim().slogf.write('\n{} loops result' .format(qnum+1))
 		sim().slogf.write('\n'+str(np.round(Qtable, 3)))
 		sim().slogf.close()
-		np.savetxt('Qlogs/result_'+MODE+'.csv', Qtable)
+		np.savetxt('Qlogs/result_'+MODE+'.csv', fmt="%.3f", Qtable)
 
 		time = time.time() - start
 		print("\ntime {:4d}:{:02d}" .format(int(time)//60, int(time)%60))

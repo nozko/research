@@ -57,17 +57,8 @@ class control:
 		return heater
 
 
-	# keep the road temperature above 0
-	def orignal2_0(self, TS):
-		if( TS < 0 ):
-			heater = 1
-		else:
-			heater = 0
-		return heater
-
-
 	# keep the road temperature above 10
-	def original2_1(self, TS):
+	def original2_0(self, TS):
 		if( TS < 10 ):
 			heater = 1
 		else:
@@ -76,7 +67,7 @@ class control:
 
 
 	# keep the road temperature above 0  version.2
-	def original2_2(self, TS, snow):
+	def original2_1(self, TS, snow):
 		if( (TS < 0) or (snow >= 0.2) ):
 			heater = 1
 		else:
@@ -84,8 +75,17 @@ class control:
 		return heater
 
 
+	# keep the road temperature above 10  version.2
+	def original2_2(self, TS, snow):
+		if( (TS < 10) or (snow >= 0.2) ):
+			heater = 1
+		else:
+			heater = 0
+		return heater
+
+
 	# start warming up the road before snow falls continuously
-	def original3(self, date, snow, TS):
+	def original3_0(self, date, snow, TS):
 		for start in start_list:
 			back = start - datetime.timedelta(minutes=20)
 			if( date>=back and date<=start and TS<60 ):
@@ -98,22 +98,24 @@ class control:
 		return heater
 
 
-	# switch on and off at fixed time while snowing
-	def original4_0(self, onT, offT, pre, heater):
-		if( pre > 0.0 ):
-			if( offT >= 10.0 ):
+	# start warming up the road before snow falls continuously version.2
+	def original3_1(self, date, snow, TS, pre):
+		for start in start_list:
+			back = start - datetime.timedelta(minutes=20)
+			if( date>=back and date<=start and TS<60 ):
 				heater = 1
-			elif( onT >= 10.0 ):
+				break
+			else:
 				heater = 0
-			elif( onT==0 and offT==0 ):
-				heater = 1
-		else:
-			heater = 0
+		if( pre > 0.0 and TS<60 ):
+			heater = 1
+		if( snow >= 0.2 ):
+			heater = 1
 		return heater
 
 
-	# switch on/off at fixed time while snowing and melt all snow after snow stops
-	def original4_1(self, onT, offT, pre, heater, snow):
+	# switch on/off at fixed time while snowing and melt all after snow stops
+	def original4_0(self, onT, offT, pre, heater, snow):
 		if( pre > 0.0 ):
 			if( offT >= 10.0 ):
 				heater = 1
@@ -126,6 +128,46 @@ class control:
 				heater = 1
 			else:
 				heater = 0
+		return heater
+
+
+	# switch on/off at fixed time while snowing and melt all after snow stops
+	# version.2
+	def original4_1(self, onT, offT, pre, heater, snow):
+		if( pre > 0.0 ):
+			if( offT >= 10.0 ):
+				heater = 1
+			elif( onT >= 20.0 ):
+				heater = 0
+			elif( onT==0 and offT==0 ):
+				heater = 1
+		else:
+			if( snow >= 0.2 ):
+				heater = 1
+			else:
+				heater = 0
+		return heater
+
+
+	# turn off a little earlier
+	def original5_0(self, snow, previous_snow):
+		if( snow >= 0.2 ):
+			heater = 1
+			if( (snow<0.3) and (previous_snow>snow) ):
+				heater = 0
+		else:
+			heater = 0
+		return heater
+
+
+	# turn off a little more earlier
+	def original5_1(self, snow, previous_snow):
+		if( snow >= 0.2 ):
+			heater = 1
+			if( (snow<0.5) and (previous_snow>snow) ):
+				heater = 0
+		else:
+			heater = 0
 		return heater
 
 
@@ -158,11 +200,11 @@ class Qlearning:
 	def initializeQ(self):
 		# snow accumulation Q[action][Srank]
 		if( self.MODE == 'S' ):
-			Qtable = np.empty((2, 6))
+			Qtable = np.empty((2, 7))
 
 		# snow accumulation and temperature Q[action][Srank][Trank]
 		elif( self.MODE == 'ST' ):
-			Qtable = np.empty((2, 6, 6))
+			Qtable = np.empty((2, 7, 6))
 
 		# precipitation Q[action][Prank]
 		elif( self.MODE == 'P' ):
@@ -174,7 +216,7 @@ class Qlearning:
 
 		# snow accumulation and precipitation Q[action][Srank][Prank]
 		elif( self.MODE=='SP' ):
-			Qtable = np.empty((2, 6, 5))
+			Qtable = np.empty((2, 7, 5))
 
 		# continuously operating time Q[action][Crank]
 		elif( self.MODE=='C' ):
@@ -183,7 +225,7 @@ class Qlearning:
 		# snow accumulation & continuously operating time
 		# Q[action][Srank][Crank]
 		elif( self.MODE=='SC' ):
-			Qtable = np.empty((2, 6, 5))
+			Qtable = np.empty((2, 7, 5))
 
 		# precipitation and continuously operating time Q[action][Prank][Crank]
 		elif( self.MODE=='PC' ):
@@ -192,7 +234,7 @@ class Qlearning:
 		# snow accumulate, precipitation and continuously operating time
 		# Q[action][Srank][Prank][Crank]
 		elif( self.MODE=='SPC' ):
-			Qtable = np.empty((6, 5, 5, 2))
+			Qtable = np.empty((2, 7, 5, 5))
 
 		# invalid MODE
 		else:
@@ -218,15 +260,17 @@ class Qlearning:
 
 
 	def Srank(self, snow):
+		standard = 0.2
 		if( snow < 0 ):
 			print('invalid value of snow accumulation')
 			sys.exit()
-		elif( snow < 0.2 ):	Srank = 0
-		elif( snow < 0.5 ):	Srank = 1
-		elif( snow < 1.0 ):	Srank = 2
-		elif( snow < 1.5 ):	Srank = 3
-		elif( snow < 2.0 ):	Srank = 4
-		else:				Srank = 5
+		elif( snow < standard ):		Srank = 0
+		elif( snow < standard+0.1 ):	Srank = 1
+		elif( snow < standard+0.2 ):	Srank = 2
+		elif( snow < standard+0.3 ):	Srank = 3
+		elif( snow < standard+0.5 ):	Srank = 4
+		elif( snow < standard+1.0 ):	Srank = 5
+		else:							Srank = 6
 		return Srank
 
 
@@ -532,10 +576,10 @@ class Qlearning:
 
 
 	def nextMax_SPC(self, Q, nextSr, nextPr, nextCr):
-		if( Q[nextSr][nextPr][nextCr][1] > Q[nextSr][nextPr][nextCr][0] ):
-			return Q[nextSr][nextPr][nextCr][1]
+		if( Q[1][nextSr][nextPr][nextCr] > Q[0][nextSr][nextPr][nextCr] ):
+			return Q[1][nextSr][nextPr][nextCr]
 		else:
-			return Q[nextSr][nextPr][nextCr][0]
+			return Q[0][nextSr][nextPr][nextCr]
 
 
 	def updateQ_SPC(self, Q, comp, heater, Srank, Prank, Crank, onSr, offSr,\
@@ -553,14 +597,14 @@ class Qlearning:
 		if(heater==1):
 			nextMax = self.nextMax_SPC(Q, onSr, nextPr, onCr)
 			reward += self.r_on
-			Q[Srank][Prank][Crank][1] = (1-self.alpha) * Q[Srank][Prank][Crank][1]\
+			Q[1][Srank][Prank][Crank] = (1-self.alpha) * Q[1][Srank][Prank][Crank]\
 									+ self.alpha * (reward + self.gamma*nextMax)
-			Q[Srank][Prank][Crank][1] = '{:.2f}' .format(Q[Srank][Prank][Crank][1])
+			Q[1][Srank][Prank][Crank] = '{:.2f}' .format(Q[1][Srank][Prank][Crank])
 		else:
 			nextMax = self.nextMax_SPC(Q, offSr, nextPr, offCr)
-			Q[Srank][Prank][Crank][0] = (1-self.alpha) * Q[Srank][Prank][Crank][0]\
+			Q[0][Srank][Prank][Crank] = (1-self.alpha) * Q[0][Srank][Prank][Crank]\
 									+ self.alpha * (reward + self.gamma*nextMax)
-			Q[Srank][Prank][Crank][0] = '{:.2f}' .format(Q[Srank][Prank][Crank][0])
+			Q[0][Srank][Prank][Crank] = '{:.2f}' .format(Q[0][Srank][Prank][Crank])
 
 		self.slogf.write('{:>5}, ' .format(reward))
 		self.slogf.close()
@@ -709,7 +753,7 @@ class Qlearning:
 	def select_act_SPC(self, Q, Srank, Prank, Crank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[Srank][Prank][Crank][1] > Q[Srank][Prank][Crank][0] ):
+			if( Q[1][Srank][Prank][Crank] > Q[0][Srank][Prank][Crank] ):
 				self.slogf.write(', normal, ')
 				act = 1
 			else:

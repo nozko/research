@@ -129,26 +129,29 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='calculation interval')
 	parser.add_argument('interval', help='0~10[min]')
-	parser.add_argument('mode', help='p, s, on, off, 1, 2.0, 2.1, 2.2, 3,\
-									4.0 or 4.1')
+	parser.add_argument('mode', help='p, s, on, off, 1, 2.0, 2.1, 2.2, 3.0,\
+									3.1, 4.0, 4.1, 5.0 or 5.1')
 	args = parser.parse_args()
 
 	global interval, mode
 	interval = float(args.interval)
 	mode     = args.mode
-	# mode p     : judge from precipitation
-	# mode s     : judge from snow accumulation
-	# mode on    : always on
-	# mode off   : always off
-	# mode orig1 : melt after the snowing stops
-	# mode orig2 : keep the road temperature above 0(2.0) or 10(2.1)
-	# mode orig3 : start warming up the road before snow falls continuously
+	# mode p   : judge from precipitation
+	# mode s   : judge from snow accumulation
+	# mode on  : always on
+	# mode off : always off
+	# mode 1   : melt after the snowing stops
+	# mode 2.? : keep the road temperature above 0(2.0) or 10(2.1)
+	# mode 3.? : start warming up the road before snow falls continuously
+	# mode 4.? : switch on/off at a time while snowing and melt all after stops
+	# mode 5.? : turn off earlier
 	print('interval : {}[min]\tmode : {}' .format(interval, mode))
 
-	if(mode!='p' and mode!='s' and mode!='on' and mode!='off' and mode!='1'\
-			and mode!='2.0' and mode!='2.1' and mode!='2.2' and mode!='3'\
-			and mode!='4.0' and mode!='4.1'):
-		print('invalid mode error')
+	if(mode!='p' and mode!='s' and mode!='on' and mode!='off' and mode!='1'
+			and mode!='2.0' and mode!='2.1' and mode!='2.2' and mode!='3.0'
+			and mode!='3.1' and mode!='4.0' and mode!='4.1' and mode!='5.0'
+			and mode!='5.1'):
+		print('inappropriate mode selected')
 		sys.exit()
 
 	if(os.path.exists('logs/logs_'+str(interval)+'_'+mode+'.csv')):
@@ -178,9 +181,11 @@ if __name__ == '__main__':
 	htr   = 0
 	sat   = 0		# 相当外気温 Sol-Air Temperature
 
-	snow   = 0.0	# [kg/m^2] snow mass
-	Scover = 0.0	# [m] snow volume
-	cover  = 0.0	# [m] snow volume
+	snow    = 0.0	# [kg/m^2] snow mass
+	maxsnow = 0.0
+	previous_snow = 0.0
+	Scover  = 0.0	# [m] snow volume
+	cover   = 0.0	# [m] snow volume
 
 	data     = open('sapporo2017.csv', 'r')
 	all_data = data.readlines()
@@ -299,15 +304,26 @@ if __name__ == '__main__':
 				elif(mode=='2.0'):
 					heater = sim().control.original2_0(TS)
 				elif(mode=='2.1'):
-					heater = sim().control.original2_1(TS)
-				elif(mode=='2.2'):
 					heater = sim().control.original2_1(TS, snow)
-				elif(mode=='3'):
-					heater = sim().control.original3(date, snow, TS)
+				elif(mode=='2.2'):
+					heater = sim().control.original2_2(TS, snow)
+				elif(mode=='3.0'):
+					heater = sim().control.original3_0(date, snow, TS)
+				elif(mode=='3.1'):
+					heater = sim().control.original3_1(date, snow, TS, pre)
 				elif(mode=='4.0'):
-					heater = sim().control.original4_0(onT, offT, pre, heater)
+					heater = sim().control.original4_0(onT,offT,pre,heater,snow)
 				elif(mode=='4.1'):
 					heater = sim().control.original4_1(onT,offT,pre,heater,snow)
+				elif(mode=='5.0'):
+					heater = sim().control.original5_0(snow, previous_snow)
+					previous_snow = snow
+				elif(mode=='5.1'):
+					heater = sim().control.original5_1(snow, previous_snow)
+					previous_snow = snow
+				else:
+					print('inappropriate mode selected')
+					sys.exit()
 
 				ntime[heater][level] += 1
 
@@ -383,7 +399,6 @@ if __name__ == '__main__':
 				htrm = 1 / (1/(sim().funa(Wspeed)+4) + DH/0.08)
 
 				# calc amount of snow melting
-#			melt = (200*TS+htrm*sat-590*evaporate) * (interval/60.0)/Hfusion
 				melt = ((200*TS) + (htrm*sat) - (590*evaporate)) \
 							* (interval/60.0)/Hfusion*(1.0/85.0)
 				BF   = 1			# (?)
@@ -533,6 +548,8 @@ if __name__ == '__main__':
 
 			date = date + datetime.timedelta(minutes=interval)
 
+			if( snow > maxsnow ):	maxsnow = snow
+
 			str_snow = '{:.3f}[kg/m^2]' .format(snow)
 			sys.stderr.write('\r{}{:>6}℃   {:.3f}[mm/min]  snow:{:>15}  {}'
 							.format(date, temp_o, pre, str_snow, heater))
@@ -553,6 +570,8 @@ if __name__ == '__main__':
 		Tdry_off  = ntime[0][2] * interval
 		Tdry_on   = ntime[1][2] * interval
 
-		print('\ntotal operating time : {} [min]' .format(onSum))
-		sim().logf.write('total operating time : {} [min]' .format(onSum))
+		print('\ntotal operating : {} [min],  max snow accumulation : {:.3f}\n'
+				.format(onSum, maxsnow))
+		sim().logf.write('total operating : {} [min],  max snow : {:.3f} [kg/m^2]'
+						.format(onSum, maxsnow))
 		sim().logf.close()
