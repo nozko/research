@@ -132,7 +132,7 @@ class QL:
 		gamma = 0.9
 		self.Qlearn = q_control.Qlearning(MODE, 1, alpha, gamma, interval)
 		
-		self.result = 'Qlogs/result_'+MODE+'.csv'
+		self.result = 'Qlogs/result_'+MODE+'.npy'
 
 
 
@@ -162,7 +162,7 @@ if __name__ == '__main__':
 	if(os.path.exists('Qlogs/useQ_log_'+MODE+str(interval)+'.csv')):
 		os.remove('Qlogs/useQ_log_'+MODE+str(interval)+'.csv')
 
-	Qtable = np.loadtxt(QL().result)
+	Qtable = np.load(QL().result)
 	print(Qtable)
 
 	snow_minusT = 0

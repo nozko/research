@@ -17,8 +17,6 @@ import sys
 import q_control
 
 
-interval = 3			# [min] calculatioin interval
-
 CK      = 0.3		# 緩和係数(0.7~1.5程度)
 maxT    = 70		# [℃ ] maximum temperature of heat source
 maxPene = 0.05		# [m] maximum penetration height of water
@@ -309,10 +307,12 @@ if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='MODE')
 	parser.add_argument('MODE', help='S, P, C, ST, TP, SC, PC, SP and SPC' )
+	parser.add_argument('interval', help='0~10[min]' )
 	parser.add_argument('--loop_num', '-l', default=5000)
 	args = parser.parse_args()
 
-	global MODE, Qloop
+	global MODE, Qloop, interval
+	interval = float(args.interval)
 	Qloop = int(args.loop_num)
 	MODE  = args.MODE
 	# MODE S : snow accumulation
@@ -488,11 +488,11 @@ if __name__ == '__main__':
 				Srank = QL().Qlearn.Srank(snow)
 				if( MODE.find('S') >= 0 ):
 					onSr  = QL().next_Srank(1, cover, temp_o, nightR, \
-												Wspeed, Water, rain_plus, snow,\
-												snow_plus, sfdens, tset, ilp, Qr)
+											Wspeed, Water, rain_plus, snow,\
+											snow_plus, sfdens, tset, ilp, Qr)
 					offSr = QL().next_Srank(0, cover, temp_o, nightR, \
-												Wspeed, Water, rain_plus, snow,\
-												snow_plus, sfdens, tset, ilp, Qr)
+											Wspeed, Water, rain_plus, snow,\
+											snow_plus, sfdens, tset, ilp, Qr)
 				if( MODE.find('T') >= 0 ):
 					Trank  = QL().Qlearn.Trank(temp_o)
 					nextTr = QL().next_Trank(all_data, shift, data_cnt)
@@ -790,11 +790,12 @@ if __name__ == '__main__':
 		Qsup        = Qsup * interval/60.0
 		Qr          = Qr * interval/60.0
 
+		Qtable = np.round(Qtable, 3)
 		sim().slogf.write('\n{} loops result' .format(qnum+1))
-		sim().slogf.write('\n'+str(np.round(Qtable, 3)))
+		sim().slogf.write('\n'+str(Qtable))
 		sim().slogf.close()
-		np.savetxt('Qlogs/result_'+MODE+'.csv', fmt="%.3f", Qtable)
+		np.save('Qlogs/result_'+MODE, Qtable)
 
 		time = time.time() - start
 		print("\ntime {:4d}:{:02d}" .format(int(time)//60, int(time)%60))
-#		print('end time :', time.ctime())
+		print('end time :', datetime.datetime.now())
