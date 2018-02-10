@@ -46,6 +46,12 @@ class control:
 		return heater
 
 
+	def random_act(self):
+		if(random.random()>0.5):	heater = 1
+		else:						heater = 0
+		return heater
+
+
 	# melt after the snowing stops
 	def original1(self, pre, snow):
 		if( snow < 0.2 ):
@@ -178,18 +184,14 @@ class Qlearning:
 
 	def __init__(self, MODE, Qloop, alpha, gamma, interval):
 		self.MODE = MODE
+		self.interval = interval
 
 		# parameters
 		self.alpha = alpha
 		self.gamma = gamma
 
-		# rewards
-		self.r_on   = -1 * interval /100.0
-		self.r_comp = 1000
-		self.r_much = -1 * interval /10.0
-
 		# epsilon-greedy
-		self.eps = 0.2
+		self.eps = 0.05
 		self.normal = 0.0
 
 		# log
@@ -198,79 +200,96 @@ class Qlearning:
 
 
 	def initializeQ(self):
+		Sr_num = 8
+		Tr_num = 6
+		Pr_num = 6
+		Cr_num = 5
+		Rr_num = 7
+
 		# snow accumulation Q[action][Srank]
 		if( self.MODE == 'S' ):
-			Qtable = np.empty((2, 7))
+			Qtable = np.ones((2, Sr_num))
 
 		# snow accumulation and temperature Q[action][Srank][Trank]
 		elif( self.MODE == 'ST' ):
-			Qtable = np.empty((2, 7, 6))
+			Qtable = np.ones((2, Sr_num, Tr_num))
 
 		# precipitation Q[action][Prank]
 		elif( self.MODE == 'P' ):
-			Qtable = np.empty((2, 5))
+			Qtable = np.ones((2, Pr_num))
 
 		# temperature and Precipitation Q[action][Trank][Prank]
 		elif( self.MODE == 'TP' ):
-			Qtable = np.empty((2, 6, 5))
+			Qtable = np.ones((2, Tr_num, Pr_num))
 
 		# snow accumulation and precipitation Q[action][Srank][Prank]
 		elif( self.MODE=='SP' ):
-			Qtable = np.empty((2, 7, 5))
-
-		# continuously operating time Q[action][Crank]
-		elif( self.MODE=='C' ):
-			Qtable = np.empty((2, 5))
+			Qtable = np.ones((2, Sr_num, Pr_num))
 
 		# snow accumulation & continuously operating time
 		# Q[action][Srank][Crank]
 		elif( self.MODE=='SC' ):
-			Qtable = np.empty((2, 7, 5))
+			Qtable = np.ones((2, Sr_num, Cr_num))
+
+		# snow accumulation & road temperature Q[action][Srank][Rrank]
+		elif( self.MODE=='SR' ):
+			Qtable = np.ones((2, Sr_num, Rr_num))
+
+		# precipitation & road temperature Q[Prank][Rrank]
+		elif( self.MODE=='PR' ):
+			Qtable = np.ones((2, Pr_num, Rr_num))
 
 		# precipitation and continuously operating time Q[action][Prank][Crank]
 		elif( self.MODE=='PC' ):
-			Qtable = np.empty((2, 5, 5))
+			Qtable = np.ones((2, Pr_num, Cr_num))
 
 		# snow accumulate, precipitation and continuously operating time
 		# Q[action][Srank][Prank][Crank]
 		elif( self.MODE=='SPC' ):
-			Qtable = np.empty((2, 7, 5, 5))
+			Qtable = np.ones((2, Sr_num, Pr_num, Cr_num))
+
+		# snow accumulate, precipitation and road temperature
+		# Q[action][Srank][Prank][Rrank]
+		elif( self.MODE=='SPR' ):
+			Qtable = np.ones((2, Sr_num, Pr_num, Rr_num))
+
+		elif( self.MODE=='STPR' ):
+			Qtable = np.ones((2, Sr_num, Tr_num, Pr_num, Rr_num))
 
 		# invalid MODE
 		else:
 			print('invalid MODE error')
 			sys.exit()
 
-		Qtable = np.round(Qtable, 3)
 		self.qlogf.write(str(Qtable))
 		self.qlogf.close()
 
-		comp = True
-		return Qtable, comp
+		return Qtable
 
 
 	def Trank(self, temp):
-		if( temp < -6 ):	Trank = 0
-		elif( temp < -3 ):	Trank = 1
+		if( temp < -4 ):	Trank = 0
+		elif( temp < -2 ):	Trank = 1
 		elif( temp < 0 ):	Trank = 2
-		elif( temp < 3 ):	Trank = 3
-		elif( temp < 6 ):	Trank = 4
+		elif( temp < 2 ):	Trank = 3
+		elif( temp < 4 ):	Trank = 4
 		else:				Trank = 5
 		return Trank
 
 
 	def Srank(self, snow):
-		standard = 0.2
+		threshold = 0.2
 		if( snow < 0 ):
 			print('invalid value of snow accumulation')
 			sys.exit()
-		elif( snow < standard ):		Srank = 0
-		elif( snow < standard+0.1 ):	Srank = 1
-		elif( snow < standard+0.2 ):	Srank = 2
-		elif( snow < standard+0.3 ):	Srank = 3
-		elif( snow < standard+0.5 ):	Srank = 4
-		elif( snow < standard+1.0 ):	Srank = 5
-		else:							Srank = 6
+		elif( snow < threshold/2.0 ):	Srank = 0
+		elif( snow < threshold ):		Srank = 1
+		elif( snow < threshold+0.1 ):	Srank = 2
+		elif( snow < threshold+0.2 ):	Srank = 3
+		elif( snow < threshold+0.3 ):	Srank = 4
+		elif( snow < threshold+1.0 ):	Srank = 5
+		elif( snow < 3.0 ):				Srank = 6
+		else:							Srank = 7
 		return Srank
 
 
@@ -279,10 +298,11 @@ class Qlearning:
 			print('invalid value of precipitation')
 			sys.exit()
 		elif( pre == 0 ):	Prank = 0
-		elif( pre < 0.01 ):	Prank = 1
-		elif( pre < 0.02 ):	Prank = 2
-		elif( pre < 0.03 ):	Prank = 3
-		else:				Prank = 4
+		elif( pre<0.005 ):	Prank = 1
+		elif( pre<0.01 ):	Prank = 2
+		elif( pre<0.015 ):	Prank = 3
+		elif( pre<0.03 ):	Prank = 4
+		else:				Prank = 5
 		return Prank
 
 	
@@ -295,6 +315,41 @@ class Qlearning:
 		return Crank
 
 
+	def Rrank(self, TS):
+		if( TS < 10 ):		Rrank = 0
+		elif( TS < 20 ):	Rrank = 1
+		elif( TS < 30 ):	Rrank = 2
+		elif( TS < 40 ):	Rrank = 3
+		elif( TS < 50 ):	Rrank = 4
+		elif( TS < 60 ):	Rrank = 5
+		else:				Rrank = 6
+		return Rrank
+
+
+	# calculate rewards
+	def calc_reward(self, comp, heater, nextSr):
+		reward = 0
+
+		r_on   = -1 * self.interval / 10.0
+		r_comp = 100
+		r_much = -1 * self.interval / 50.0
+		r_nos  = self.interval / 5000.0
+
+		if( nextSr <= 1 ):
+			if(comp==False):	reward += r_comp
+			if(heater==0):		reward += r_nos
+			comp = True
+		else:
+			if(nextSr>=6 and heater==0):
+				reward += r_much
+			comp = False
+
+		if(heater==1 and nextSr<7):
+			reward += r_on
+
+		return reward, comp
+
+
 	def nextMax_S(self, Q, eachSr):
 		if( Q[1][eachSr] > Q[0][eachSr] ):
 			return Q[1][eachSr]
@@ -303,29 +358,17 @@ class Qlearning:
 
 
 	def updateQ_S(self, Q, comp, heater, Srank, onSr, offSr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
 		if(heater==1):
-			reward += self.r_on
+			reward, comp = self.calc_reward(comp, heater, onSr)
 			nextMax = self.nextMax_S(Q, onSr)
-			Q[1][Srank] = (1-self.alpha) * Q[1][Srank] \
-							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Srank] = "%.3f" % Q[1][Srank]
 		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
 			nextMax = self.nextMax_S(Q, offSr)
-			Q[0][Srank] = (1-self.alpha) * Q[0][Srank] \
+		Q[heater][Srank] = (1-self.alpha) * Q[heater][Srank] \
 							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Srank] = "%.3f" % Q[0][Srank]
+		Q[heater][Srank] = "%.3f" % Q[heater][Srank]
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -338,29 +381,17 @@ class Qlearning:
 
 
 	def updateQ_ST(self, Q, comp, heater, Srank, Trank, onSr, offSr, nextTr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
 		if(heater==1):
-			reward += self.r_on
+			reward, comp = self.calc_reward(comp, heater, onSr)
 			nextMax = self.nextMax_ST(Q, onSr, nextTr)
-			Q[1][Srank][Trank] = (1-self.alpha) * Q[1][Srank][Trank] \
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Srank][Trank] = '{:.3f}' .format(Q[1][Srank][Trank])
 		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
 			nextMax = self.nextMax_ST(Q, offSr, nextTr)
-			Q[0][Srank][Trank] = (1-self.alpha) * Q[0][Srank][Trank] \
+		Q[heater][Srank][Trank] = (1-self.alpha) * Q[heater][Srank][Trank] \
 								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Srank][Trank] = '{:.3f}' .format(Q[0][Srank][Trank])
+		Q[heater][Srank][Trank] = '{:.5f}' .format(Q[heater][Srank][Trank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -372,64 +403,17 @@ class Qlearning:
 			return Q[0][nextPr]
 
 
-	def updateQ_P(self, Q, comp, heater, Srank, Prank, nextPr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
+	def updateQ_P(self, Q, comp, heater, onSr, offSr, Prank, nextPr):
 		nextMax = self.nextMax_P(Q, nextPr)
 		if(heater==1):
-			reward += self.r_on
-			Q[1][Prank] = (1-self.alpha) * Q[1][Prank]\
-							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Prank] = '{:.5f}' .format(Q[1][Prank])
+			reward, comp = self.calc_reward(comp, heater, onSr)
 		else:
-			Q[0][Prank] = (1-self.alpha) * Q[0][Prank]\
+			reward, comp = self.calc_reward(comp, heater, offSr)
+		Q[heater][Prank] = (1-self.alpha) * Q[heater][Prank]\
 							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Prank] = '{:.5f}' .format(Q[0][Prank])
+		Q[heater][Prank] = '{:.5f}' .format(Q[heater][Prank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
-		self.slogf.close()
-		return Q, comp
-
-
-	def nextMax_C(self, Q, nextCr):
-		if( Q[1][nextCr] > Q[0][nextCr] ):
-			return Q[1][nextCr]
-		else:
-			return Q[0][nextCr]
-
-
-	def updateQ_C(self, Q, comp, heater, Srank, Crank, onCr, offCr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
-		if(heater==1):
-			reward += self.r_on
-			nextMax = self.nextMax_C(Q, onCr)
-			Q[1][Crank] = (1-self.alpha) * Q[1][Crank] \
-							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Crank] = '{:.5f}' .format(Q[1][Crank])
-		else:
-			nextMax = self.nextMax_C(Q, offCr)
-			Q[0][Crank] = (1-self.alpha) * Q[0][Crank] \
-							+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Crank] = '{:.5f}' .format(Q[0][Crank])
-
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -441,29 +425,16 @@ class Qlearning:
 			return Q[0][nextTr][nextPr]
 
 
-	def updateQ_TP(self, Q, comp, heater, Srank, Trank, Prank, nextTr, nextPr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
+	def updateQ_TP(self,Q,comp,heater,onSr,offSr,Trank,Prank,nextTr,nextPr):
 		nextMax = self.nextMax_TP(Q, nextTr, nextPr)
 		if(heater==1):
-			reward += self.r_on
-			Q[1][Trank][Prank] = (1-self.alpha) * Q[1][Trank][Prank]\
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Trank][Prank] = '{:.3f}' .format(Q[1][Trank][Prank])
+			reward, comp = self.calc_reward(comp, heater, onSr)
 		else:
-			Q[0][Trank][Prank] = (1-self.alpha) * Q[0][Trank][Prank]\
+			reward, comp = self.calc_reward(comp, heater, offSr)
+		Q[heater][Trank][Prank] = (1-self.alpha) * Q[heater][Trank][Prank]\
 								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Trank][Prank] = '{:.3f}' .format(Q[0][Trank][Prank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -476,29 +447,17 @@ class Qlearning:
 
 
 	def updateQ_SP(self, Q, comp, heater, Srank, Prank, onSr, offSr, nextPr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
 		if(heater==1):
-			reward += self.r_on
+			reward, comp = self.calc_reward(comp, heater, onSr)
 			nextMax = self.nextMax_SP(Q, onSr, nextPr)
-			Q[1][Srank][Prank] = (1-self.alpha) * Q[1][Srank][Prank] \
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Srank][Prank] = '{:.3f}' .format(Q[1][Srank][Prank])
 		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
 			nextMax = self.nextMax_SP(Q, offSr, nextPr)
-			Q[0][Srank][Prank] = (1-self.alpha) * Q[0][Srank][Prank] \
+		Q[heater][Srank][Prank] = (1-self.alpha) * Q[heater][Srank][Prank] \
 								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Srank][Prank] = '{:.3f}' .format(Q[0][Srank][Prank])
+		Q[heater][Srank][Prank] = '{:.5f}' .format(Q[heater][Srank][Prank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -512,30 +471,63 @@ class Qlearning:
 
 	def updateQ_SC(self, Q, comp, heater, Srank, Crank,\
 					onSr, offSr, onCr, offCr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			else:
-				comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
 		if(heater==1):
-			reward += self.r_on
+			reward, comp = self.calc_reward(comp, heater, onSr)
 			nextMax = self.nextMax_SC(Q, onSr, onCr)
-			Q[1][Srank][Crank] = (1-self.alpha) * Q[1][Srank][Crank]\
-									+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Srank][Crank] = '{:.3f}' .format(Q[1][Srank][Crank])
 		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
 			nextMax = self.nextMax_SC(Q, offSr, offCr)
-			Q[0][Srank][Crank] = (1-self.alpha) * Q[0][Srank][Crank]\
+		Q[heater][Srank][Crank] = (1-self.alpha) * Q[heater][Srank][Crank]\
 									+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Srank][Crank] = '{:.3f}' .format(Q[0][Srank][Crank])
+		Q[heater][Srank][Crank] = '{:.5f}' .format(Q[heater][Srank][Crank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
+		self.slogf.close()
+		return Q, comp
+
+
+	def nextMax_SR(self, Q, eachSr, eachRr):
+		if( Q[1][eachSr][eachRr] > Q[0][eachSr][eachRr] ):
+			return Q[1][eachSr][eachRr]
+		else:
+			return Q[0][eachSr][eachRr]
+
+
+	def updateQ_SR(self, Q, comp, heater, Srank, Rrank, onSr, offSr, onRr, offRr):
+		if(heater==1):
+			reward, comp = self.calc_reward(comp, heater, onSr)
+			nextMax = self.nextMax_SR(Q, onSr, onRr)
+		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
+			nextMax = self.nextMax_SR(Q, offSr, offRr)
+		Q[heater][Srank][Rrank] = (1-self.alpha)*Q[heater][Srank][Rrank]\
+									+ self.alpha*(reward + self.gamma*nextMax)
+		Q[heater][Srank][Rrank] = '{:.5f}' .format(Q[heater][Srank][Rrank])
+
+		self.slogf.write('{:>6}, ' .format(str(reward)))
+		self.slogf.close()
+		return Q, comp
+
+
+	def nextMax_PR(self, Q, nextPr, eachRr):
+		if( Q[1][nextPr][eachRr] > Q[0][nextPr][eachRr] ):
+			return Q[1][nextPr][eachRr]
+		else:
+			return Q[0][nextPr][eachRr]
+
+
+	def updateQ_PR(self,Q,comp,heater,Prank,Rrank,onSr,offSr,nextPr,onRr,offRr):
+		if(heater==1):
+			reward, comp = self.calc_reward(comp, heater, onSr)
+			nextMax = self.nextMax_PR(Q, nextPr, onRr)
+		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
+			nextMax = self.nextMax_PR(Q, nextPr, offRr)
+		Q[heater][Prank][Rrank] = (1-self.alpha)*Q[heater][Prank][Rrank]\
+									+ self.alpha*(reward + self.gamma*nextMax)
+		Q[heater][Prank][Rrank] = '{:.5f}' .format(Q[heater][Prank][Rrank])
+
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -547,30 +539,18 @@ class Qlearning:
 			return Q[0][nextPr][nextCr]
 
 
-	def updateQ_PC(self, Q, comp, heater, Srank, Prank, Crank, nextPr, onCr, offCr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
+	def updateQ_PC(self,Q,comp,heater,onSr,offSr,Prank,Crank,nextPr,onCr,offCr):
 		if(heater==1):
+			reward, comp = self.calc_reward(comp, heater, onSr)
 			nextMax = self.nextMax_PC(Q, nextPr, onCr)
-			reward += self.r_on
-			Q[1][Prank][Crank] = (1-self.alpha) * Q[1][Prank][Crank]\
-								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Prank][Crank] = '{:.3f}' .format(Q[1][Prank][Crank])
 		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
 			nextMax = self.nextMax_PC(Q, nextPr, offCr)
-			Q[0][Prank][Crank] = (1-self.alpha) * Q[0][Prank][Crank]\
+		Q[heater][Prank][Crank] = (1-self.alpha) * Q[heater][Prank][Crank]\
 								+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Prank][Crank] = '{:.3f}' .format(Q[0][Prank][Crank])
+		Q[heater][Prank][Crank] = '{:.5f}' .format(Q[heater][Prank][Crank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
@@ -584,40 +564,82 @@ class Qlearning:
 
 	def updateQ_SPC(self, Q, comp, heater, Srank, Prank, Crank, onSr, offSr,\
 					nextPr, onCr, offCr):
-		reward = 0
-		if(Srank==0):
-			if(comp==False):
-				reward += self.r_comp
-			comp = True
-		else:
-			if(Srank>=4 and heater==0):
-				reward += self.r_much
-			comp = False
-
 		if(heater==1):
+			reward, comp = self.calc_reward(comp, heater, onSr)
 			nextMax = self.nextMax_SPC(Q, onSr, nextPr, onCr)
-			reward += self.r_on
-			Q[1][Srank][Prank][Crank] = (1-self.alpha) * Q[1][Srank][Prank][Crank]\
-									+ self.alpha * (reward + self.gamma*nextMax)
-			Q[1][Srank][Prank][Crank] = '{:.2f}' .format(Q[1][Srank][Prank][Crank])
 		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
 			nextMax = self.nextMax_SPC(Q, offSr, nextPr, offCr)
-			Q[0][Srank][Prank][Crank] = (1-self.alpha) * Q[0][Srank][Prank][Crank]\
+		h = heater
+		Q[h][Srank][Prank][Crank] = (1-self.alpha) * Q[h][Srank][Prank][Crank]\
 									+ self.alpha * (reward + self.gamma*nextMax)
-			Q[0][Srank][Prank][Crank] = '{:.2f}' .format(Q[0][Srank][Prank][Crank])
+		Q[h][Srank][Prank][Crank] = '{:.2f}' .format(Q[h][Srank][Prank][Crank])
 
-		self.slogf.write('{:>5}, ' .format(reward))
+		self.slogf.write('{:>6}, ' .format(str(reward)))
+		self.slogf.close()
+		return Q, comp
+
+
+	def nextMax_SPR(self, Q, nextSr, nextPr, nextRr):
+		if( Q[1][nextSr][nextPr][nextRr] > Q[0][nextSr][nextPr][nextRr] ):
+			return Q[1][nextSr][nextPr][nextRr]
+		else:
+			return Q[0][nextSr][nextPr][nextRr]
+
+
+	def updateQ_SPR(self, Q, comp, heater, Srank, Prank, Rrank, onSr, offSr,\
+					nextPr, onRr, offRr):
+		if(heater==1):
+			reward, comp = self.calc_reward(comp, heater, onSr)
+			nextMax = self.nextMax_SPR(Q, onSr, nextPr, onRr)
+		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
+			nextMax = self.nextMax_SPR(Q, offSr, nextPr, offRr)
+		h = heater
+		Q[h][Srank][Prank][Rrank] = (1-self.alpha) * Q[h][Srank][Prank][Rrank]\
+									+ self.alpha * (reward + self.gamma*nextMax)
+		Q[h][Srank][Prank][Rrank] = '{:.2f}' .format(Q[h][Srank][Prank][Rrank])
+
+		self.slogf.write('{:>6}, ' .format(str(reward)))
+		self.slogf.close()
+		return Q, comp
+
+
+	def nextMax_STPR(self, Q, nextSr, nextTr, nextPr, nextRr):
+		if( Q[1][nextSr][nextTr][nextPr][nextRr]\
+					> Q[0][nextSr][nextTr][nextPr][nextRr] ):
+			return Q[1][nextSr][nextTr][nextPr][nextRr]
+		else:
+			return Q[0][nextSr][nextTr][nextPr][nextRr]
+
+
+	def updateQ_STPR(self, Q, comp, heater, Srank, Trank, Prank, Rrank, onSr,\
+							offSr, nextTr, nextPr, onRr, offRr):
+		if(heater==1):
+			reward, comp = self.calc_reward(comp, heater, onSr)
+			nextMax = self.nextMax_STPR(Q, onSr, nextTr, nextPr, onRr)
+		else:
+			reward, comp = self.calc_reward(comp, heater, offSr)
+			nextMax = self.nextMax_STPR(Q, offSr, nextTr, nextPr, offRr)
+		h = heater
+		Q[h][Srank][Trank][Prank][Rrank] = (1-self.alpha)\
+											* Q[h][Srank][Trank][Prank][Rrank]\
+										+ self.alpha*(reward + self.gamma*nextMax)
+		Q[h][Srank][Trank][Prank][Rrank] = '{:.2f}'\
+										.format(Q[h][Srank][Trank][Prank][Rrank])
+
+		self.slogf.write('{:>6}, ' .format(str(reward)))
 		self.slogf.close()
 		return Q, comp
 
 
 	def random_act(self, rand, Srank):
 		if( rand <= (self.eps+self.normal) and rand > self.eps ):
-			self.slogf.write(', normal, ')
+			self.slogf.write(', n, ')
 			if(Srank==0):		act = 0
 			else:				act = 1
 		else:
-			self.slogf.write(', random, ')
+			self.slogf.write(', r, ')
 			act = random.choice(action)
 		return act
 
@@ -625,11 +647,11 @@ class Qlearning:
 	def select_act_S(self, Q, Srank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Srank] > Q[0][Srank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Srank] >= Q[0][Srank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -641,11 +663,11 @@ class Qlearning:
 	def select_act_ST(self, Q, Srank, Trank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Srank][Trank] > Q[0][Srank][Trank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Srank][Trank] >= Q[0][Srank][Trank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -657,11 +679,11 @@ class Qlearning:
 	def select_act_P(self, Q, Srank, Prank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Prank] > Q[0][Prank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Prank] >= Q[0][Prank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -673,11 +695,11 @@ class Qlearning:
 	def select_act_TP(self, Q, Srank, Trank, Prank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Trank][Prank] > Q[0][Trank][Prank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Trank][Prank] >= Q[0][Trank][Prank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -689,27 +711,11 @@ class Qlearning:
 	def select_act_SP(self, Q, Srank, Prank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Srank][Prank] > Q[0][Srank][Prank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Srank][Prank] >= Q[0][Srank][Prank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
-				act = 0
-		else:
-			act = self.random_act(rand, Srank)
-		self.slogf.write(str(act)+', ')
-		self.slogf.close()
-		return act
-
-
-	def select_act_C(self, Q, Srank, Crank):
-		rand = random.random()
-		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Crank] > Q[0][Crank] ):
-				self.slogf.write(', normal, ')
-				act = 1
-			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -721,11 +727,11 @@ class Qlearning:
 	def select_act_SC(self, Q, Srank, Crank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Srank][Crank] > Q[0][Srank][Crank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Srank][Crank] >= Q[0][Srank][Crank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -734,14 +740,45 @@ class Qlearning:
 		return act
 
 
+	def select_act_SR(self, Q, Srank, Rrank):
+		rand = random.random()
+		if( rand > (self.eps+self.normal) ):
+			if( Q[1][Srank][Rrank] >= Q[0][Srank][Rrank] ):
+				self.slogf.write(', n, ')
+				act = 1
+			else:
+				self.slogf.write(', n, ')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
+		self.slogf.write(str(act)+', ')
+		self.slogf.close()
+		return act
+
+
+	def select_act_PR(self, Q, Srank, Prank, Rrank):
+		rand = random.random()
+		if( rand > (self.eps+self.normal) ):
+			if( Q[1][Prank][Rrank] >= Q[0][Prank][Rrank] ):
+				self.slogf.write(', n, ')
+				act = 1
+			else:
+				self.slogf.write(', n, ')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
+		self.slogf.write(str(act)+', ')
+		self.slogf.close()
+		return act
+
 	def select_act_PC(self, Q, Srank, Prank, Crank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Prank][Crank] > Q[0][Prank][Crank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Prank][Crank] >= Q[0][Prank][Crank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -753,11 +790,43 @@ class Qlearning:
 	def select_act_SPC(self, Q, Srank, Prank, Crank):
 		rand = random.random()
 		if( rand > (self.eps+self.normal) ):
-			if( Q[1][Srank][Prank][Crank] > Q[0][Srank][Prank][Crank] ):
-				self.slogf.write(', normal, ')
+			if( Q[1][Srank][Prank][Crank] >= Q[0][Srank][Prank][Crank] ):
+				self.slogf.write(', n, ')
 				act = 1
 			else:
-				self.slogf.write(', normal, ')
+				self.slogf.write(', n, ')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
+		self.slogf.write(str(act)+', ')
+		self.slogf.close()
+		return act
+
+
+	def select_act_SPR(self, Q, Srank, Prank, Rrank):
+		rand = random.random()
+		if( rand > (self.eps+self.normal) ):
+			if( Q[1][Srank][Prank][Rrank] >= Q[0][Srank][Prank][Rrank] ):
+				self.slogf.write(', n, ')
+				act = 1
+			else:
+				self.slogf.write(', n, ')
+				act = 0
+		else:
+			act = self.random_act(rand, Srank)
+		self.slogf.write(str(act)+', ')
+		self.slogf.close()
+		return act
+
+
+	def select_act_STPR(self, Q, Srank, Trank, Prank, Rrank):
+		rand = random.random()
+		if( rand > (self.eps+self.normal) ):
+			if(Q[1][Srank][Trank][Prank][Rrank]>=Q[0][Srank][Trank][Prank][Rrank]):
+				self.slogf.write(', n, ')
+				act = 1
+			else:
+				self.slogf.write(', n, ')
 				act = 0
 		else:
 			act = self.random_act(rand, Srank)
@@ -781,14 +850,14 @@ if __name__ == '__main__':
 	r_goal = 100
 
 	# initialize Q table
-	Q = np.empty(((4, 4, 4)))
+	Q = np.ones(((4, 4, 4)))
 
 
 	try:
 		for num in range(10000):
 			print('----- episode {} -----' .format(num+1))
-			state = np.zeros(2, dtype=int)
-			nextstate = np.zeros(2, dtype=int)
+			state = np.ones(2, dtype=int)
+			nextstate = np.ones(2, dtype=int)
 
 			while(True):
 

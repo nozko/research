@@ -50,8 +50,6 @@ class sim:
 		self.net  = open('file.net', 'r')
 		self.slogf = open('Qlogs/useQ_log_'+MODE+str(interval)+'.csv', 'a')
 
-		self.control = q_control.control()
-
 
 	# absolute humidity
 	def abshumid(self, Temp):
@@ -127,12 +125,103 @@ class sim:
 
 class QL:
 	
-	def __init__(self):
+	def __init__(self, npy):
 		alpha = 0.01
 		gamma = 0.9
 		self.Qlearn = q_control.Qlearning(MODE, 1, alpha, gamma, interval)
 		
-		self.result = 'Qlogs/result_'+MODE+'.npy'
+		self.result = npy
+
+
+	def heater_act_S(self, Q, Srank):
+		if(Q[1][Srank] >= Q[0][Srank] ):	act = 1
+		else:								act = 0
+		return act
+
+
+	def heater_act_ST(self, Q, Srank, Trank):
+		if( Q[1][Srank][Trank] >= Q[0][Srank][Trank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_P(self, Q, Prank):
+		if( Q[1][Prank] >= Q[0][Prank] ):	act = 1
+		else:								act = 0
+		return act
+
+
+	def heater_act_TP(self, Q, Trank, Prank):
+		if( Q[1][Trank][Prank] >= Q[0][Trank][Prank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_SP(self, Q, Srank, Prank):
+		if( Q[1][Srank][Prank] >= Q[0][Srank][Prank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_SC(self, Q, Srank, Crank):
+		if( Q[1][Srank][Crank] >= Q[0][Srank][Crank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_SR(self, Q, Srank, Rrank):
+		if( Q[1][Srank][Rrank] >= Q[0][Srank][Rrank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+	def heater_act_PR(self, Q, Prank, Rrank):
+		if( Q[1][Prank][Rrank] >= Q[0][Prank][Rrank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_PC(self, Q, Prank, Crank):
+		if( Q[1][Prank][Crank] >= Q[0][Prank][Crank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_SPC(self, Q, Srank, Prank, Crank):
+		if( Q[1][Srank][Prank][Crank] >= Q[0][Srank][Prank][Crank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_SPR(self, Q, Srank, Prank, Rrank):
+		if( Q[1][Srank][Prank][Rrank] >= Q[0][Srank][Prank][Rrank] ):
+			act = 1
+		else:
+			act = 0
+		return act
+
+
+	def heater_act_STPR(self, Q, Srank, Trank, Prank, Rrank):
+		if( Q[1][Srank][Trank][Prank][Rrank] >= Q[0][Srank][Trank][Prank][Rrank] ):
+			act = 1
+		else:
+			act = 0
+		return act
 
 
 
@@ -142,8 +231,9 @@ if __name__ == '__main__':
 	print('start time :', time.ctime())
 
 	parser = argparse.ArgumentParser(description='MODE')
-	parser.add_argument('MODE', help='S, P, C, ST, TP, SC, PC, SP and SPC' )
+	parser.add_argument('MODE', help='S, P, ST, TP, SC, PC, SP, SR, PR, SPR, SPC or STPR')
 	parser.add_argument('interval', help='0~10[min]')
+	parser.add_argument('npy')
 	args = parser.parse_args()
 
 	global MODE
@@ -154,15 +244,20 @@ if __name__ == '__main__':
 	# MODE T : temperature
 	# MODE P : precipitation
 	# MODE C : continuously operating time
-	if(MODE!='S' and MODE!='P' and MODE!='C' and MODE!='ST' and MODE!='TP'\
-			and MODE!='SP' and MODE!='SC' and MODE!='PC' and MODE!='SPC'):
+	# MODE R : road temperature
+	if(MODE!='S' and MODE!='P'  and MODE!='ST' and MODE!='TP' and MODE!='SP'\
+			and MODE!='SC' and MODE!='PC' and MODE!='SR' and MODE!='PR'\
+			and MODE!='SPC' and MODE!='SPR' and MODE!='STPR'):
 		print('!!! invalid MODE ERROR !!!')
 		sys.exit()
 
 	if(os.path.exists('Qlogs/useQ_log_'+MODE+str(interval)+'.csv')):
 		os.remove('Qlogs/useQ_log_'+MODE+str(interval)+'.csv')
+	sim().slogf.write('date, temperature, precipitation, snow accumulate, TS, melt, switch')
 
-	Qtable = np.load(QL().result)
+	np.set_printoptions(threshold=np.inf)
+	npy = args.npy
+	Qtable = np.load(QL(npy).result)
 	print(Qtable)
 
 	snow_minusT = 0
@@ -172,11 +267,13 @@ if __name__ == '__main__':
 	print('  MODE   :', MODE)
 
 
-
 	try:
 
 		# initialize
 		onT    = 0		# [min] operating time
+		offT   = 0
+		onSum  = 0
+		nosT   = 0
 		temp_o = 0		# temperature outside
 		Qsup   = 0		# supplied Q
 		heater = 0		# on(1) / off(0)
@@ -192,9 +289,10 @@ if __name__ == '__main__':
 		htr    = 0
 		sat    = 0		# 相当外気温 Sol-Air Temperature
 
-		snow   = 0.0	# [kg/m^2] snow mass
-		Scover = 0.0	# [m] snow volume
-		cover  = 0.0	# [m] snow volume
+		snow    = 0.0	# [kg/m^2] snow mass
+		maxsnow = 0.0
+		Scover  = 0.0	# [m] snow volume
+		cover   = 0.0	# [m] snow volume
 
 		tset = 0
 
@@ -208,6 +306,7 @@ if __name__ == '__main__':
 		oldmin   = -1
 		data_cnt = 0
 
+		TS = 5
 
 		data1 = all_data[1].split(', ')
 		year   = data1[0]
@@ -220,15 +319,9 @@ if __name__ == '__main__':
 
 		### interval loop ###
 		while( data_cnt < data_num-1 ):
-			if(day != day_1):
-				day_cnt += 1
-			day_1 = day
-
-			shift = False
 
 			# next 10 minutes data
 			if( int(date.minute)//10 != oldmin ):
-				shift = True
 				data_cnt += 1
 				t0 = temp_o
 
@@ -251,8 +344,13 @@ if __name__ == '__main__':
 				if(all_data[data_cnt-1]=='blank\n'):
 					date = year+'-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
 					date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
-					sim().slogf.write('\nblank')
-					sim().slogf.close()
+					sim().slogf.write('\n')
+
+				if(day != day_1):
+					day_cnt += 1
+					sim().slogf.write('\n-----\n')
+#					time.sleep(0.5)
+				day_1 = day
 
 				sun = sun/4.186*1000		# [kcal/m^2]
 
@@ -261,11 +359,6 @@ if __name__ == '__main__':
 
 				oldmin = minute//10
 
-			elif( (int(date.minute)+interval)//10 != oldmin ):
-				shift = True
-
-			sim().slogf.write('\n' + str(date))
-			sim().slogf.close()
 
 			Wspeed = Wspeed0 * windC		# [m/sec] after ccorrection
 
@@ -306,37 +399,53 @@ if __name__ == '__main__':
 
 			""" Q """
 			# ranks
-			Srank = QL().Qlearn.Srank(snow)
+			Srank = QL(npy).Qlearn.Srank(snow)
 			if( MODE.find('T') >= 0 ):
-				Trank  = QL().Qlearn.Trank(temp_o)
+				Trank  = QL(npy).Qlearn.Trank(temp_o)
 			if( MODE.find('P') >= 0 ):
-				Prank  = QL().Qlearn.Prank(pre)
+				Prank  = QL(npy).Qlearn.Prank(pre)
 			if( MODE.find('C') >= 0 ):
-				Crank = QL().Qlearn.Crank(onT)
+				Crank = QL(npy).Qlearn.Crank(onT)
+			if( MODE.find('R') >= 0 ):
+				Rrank = QL(npy).Qlearn.Rrank(TS)
 
 			# decide action
 			if( MODE == 'S' ):
-				heater = QL().Qlearn.select_act_S(Qtable, Srank)
+				heater = QL(npy).heater_act_S(Qtable, Srank)
 			elif( MODE == 'P' ):
-				heater = QL().Qlearn.select_act_P(Qtable, Srank, Prank)
+				heater = QL(npy).heater_act_P(Qtable, Prank)
 			elif( MODE == 'ST' ):
-				heater = QL().Qlearn.select_act_ST(Qtable, Srank, Trank)
+				heater = QL(npy).heater_act_ST(Qtable, Srank, Trank)
 			elif( MODE == 'TP' ):
-				heater = QL().Qlearn.select_act_TP(Qtable, Srank, Trank, Prank)
+				heater = QL(npy).heater_act_TP(Qtable, Trank, Prank)
 			elif( MODE == 'SP' ):
-				heater = QL().Qlearn.select_act_SP(Qtable, Srank, Prank)
-			elif( MODE == 'C' ):
-				heater = QL().Qlearn.select_act_C(Qtable, Srank, Crank)
+				heater = QL(npy).heater_act_SP(Qtable, Srank, Prank)
 			elif( MODE == 'SC' ):
-				heater = QL().Qlearn.select_act_SC(Qtable, Srank, Crank)
+				heater = QL(npy).heater_act_SC(Qtable, Srank, Crank)
+			elif( MODE == 'SR' ):
+				heater = QL(npy).heater_act_SR(Qtable, Srank, Rrank)
+			elif( MODE == 'PR' ):
+				heater = QL(npy).heater_act_PR(Qtable, Prank, Rrank)
 			elif( MODE == 'PC' ):
-				heater = QL().Qlearn.select_act_PC(Qtable, Srank, Prank, Crank)
+				heater = QL(npy).heater_act_PC(Qtable, Prank, Crank)
 			elif( MODE == 'SPC' ):
-				heater = QL().Qlearn.select_act_SPC(Qtable,Srank,Prank,Crank)
+				heater = QL(npy).heater_act_SPC(Qtable, Srank, Prank, Crank)
+			elif( MODE == 'SPR' ):
+				heater = QL(npy).heater_act_SPR(Qtable, Srank, Prank, Rrank)
+			elif( MODE == 'STPR' ):
+				heater = QL(npy).heater_act_STPR(Qtable, Srank, Trank, Prank, Rrank)
+			else:
+				print('inappropriate mode selected')
+				sys.exit()
 
 
-			if(heater==1):	onT += interval
-			else:			onT = 0
+			if(heater==1):
+				onT += interval
+				offT = 0
+				onSum += interval
+			else:
+				onT = 0
+				offT += interval
 
 			ntime[heater][level] += 1
 
@@ -528,13 +637,14 @@ if __name__ == '__main__':
 				ww = 0.0		# [kg/m^2]
 			Water = ww			# [kg/m^2]
 			snow  = Snow		# [kg/m^2]
-			sim().slogf.write('{:>5}℃\t' .format(temp_o))
-			sim().slogf.write('{}  +{:.2f}[kg/m^2]  ' .format(heater, snow_plus))
-			sim().slogf.write('-> {:.3f}[kg/m^2]' .format(snow))
-			sim().slogf.close()
 			cover = Scover		# [m]
 
 			BT = T
+
+			str_snow = '{:.3f}' .format(snow)
+			str_melt = '{:.3f}' .format(melt)
+			sim().slogf.write('{},{:>5}, {:.3f},{:>7}, {:2d},{:>7}, '
+						.format(date, temp_o, pre, str_snow, int(TS), str_melt))
 
 			Tsnow_off = ntime[0][0] * interval
 			Tsnow_on  = ntime[1][0] * interval
@@ -542,9 +652,13 @@ if __name__ == '__main__':
 			Twet_on   = ntime[1][1] * interval
 			Tdry_off  = ntime[0][2] * interval
 			Tdry_on   = ntime[1][2] * interval
+			sim().slogf.write('{}\n' .format(heater))
+
+			if( snow > maxsnow ):	maxsnow = snow
+			if( snow < 0.2 ):		nosT += interval
 
 			str_snow = '{:.3f}[kg/m^2]' .format(snow)
-			sys.stderr.write('\r{} {:>6}℃   {:.3f}[mm/min] {:>15}  {}'
+			sys.stderr.write('\r{}{:>6}℃   {:.3f}[mm/min] {:>15}  {}'
 					.format(date, temp_o, pre, str_snow, heater))
 
 			date = date + datetime.timedelta(minutes=interval)
@@ -560,4 +674,9 @@ if __name__ == '__main__':
 
 		time = time.time() - start
 		print("\ntime {:4d}:{:02d}" .format(int(time)//60, int(time)%60) )
-#		print('end time :', time.ctime())
+		print('\ntotal ope:{} [min],  max snow:{:.3f}, no snow time:{} [min]\n'
+				.format(onSum, maxsnow, nosT))
+		sim().slogf.write('total ope:{}[min],  max:{:3f}[kg/m^2], no snow:{}[min]'
+						.format(onSum, maxsnow, nosT))
+		sim().slogf.close()
+		print('end time :', datetime.datetime.now())

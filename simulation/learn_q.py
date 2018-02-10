@@ -129,8 +129,8 @@ class sim:
 class QL:
 	
 	def __init__(self):
-		alpha = 0.01
-		gamma = 0.9
+		alpha = 0.1
+		gamma = 0.99
 		self.Qlearn = q_control.Qlearning(MODE, Qloop, alpha, gamma, interval)
 
 
@@ -170,7 +170,7 @@ class QL:
 		return nextCr
 
 
-	def next_Srank(self, act, cover, temp_o, nightR, Wspeed, Water, \
+	def next_SRrank(self, act, cover, temp_o, nightR, Wspeed, Water, \
 					rain_plus, snow, snow_plus, sfdens, tset, ilp, Qr):
 		ict = 0
 		E   = 0
@@ -296,7 +296,8 @@ class QL:
 		snow = Snow
 
 		nextSr = self.Qlearn.Srank(snow)
-		return nextSr
+		nextRr = self.Qlearn.Rrank(TS)
+		return nextSr, nextRr
 
 
 
@@ -306,9 +307,9 @@ if __name__ == '__main__':
 	print('start time :', time.ctime())
 
 	parser = argparse.ArgumentParser(description='MODE')
-	parser.add_argument('MODE', help='S, P, C, ST, TP, SC, PC, SP and SPC' )
+	parser.add_argument('MODE', help='S, P, ST, TP, SC, PC, SP, SR, PR, SPR, SPC or STPR')
 	parser.add_argument('interval', help='0~10[min]' )
-	parser.add_argument('--loop_num', '-l', default=5000)
+	parser.add_argument('--loop_num', '-l', default=1000)
 	args = parser.parse_args()
 
 	global MODE, Qloop, interval
@@ -319,9 +320,11 @@ if __name__ == '__main__':
 	# MODE T : temperature
 	# MODE P : precipitation
 	# MODE C : continuously operating time
-	if(MODE!='S' and MODE!='P' and MODE!='C' and MODE!='ST' and MODE!='TP'\
-			and MODE!='SP' and MODE!='SC' and MODE!='PC' and MODE!='SPC'):
-		print('!!! invalid MODE ERROR !!!')
+	# MODE R : road temperature
+	if(MODE!='S' and MODE!='P' and MODE!='ST' and MODE!='TP' and MODE!='SP'\
+			and MODE!='SC' and MODE!='PC' and MODE!='SPC' and MODE!='SR'\
+			and MODE!='PR' and MODE!='SPR' and MODE!='STPR'):
+		print('!!! inappropriate MODE selected !!!')
 		sys.exit()
 	elif( Qloop < 1 ):
 		print('! NO LOOP !')
@@ -338,9 +341,10 @@ if __name__ == '__main__':
 	if(os.path.exists('Qlogs/q_log_'+MODE+'.csv')):
 		os.remove('Qlogs/q_log_'+MODE+'.csv')
 
-
 	# initialize Q table
-	Qtable, comp = QL().Qlearn.initializeQ()
+	Qtable = QL().Qlearn.initializeQ()
+
+	np.set_printoptions(threshold=np.inf)
 
 
 	try:
@@ -381,11 +385,15 @@ if __name__ == '__main__':
 			day_1    = 0
 			oldmin   = -1
 
+			TS = 5
+			comp = True
+
 
 			if(os.path.exists('Qlogs/state_log_'+MODE+'.csv')):
 				os.remove('Qlogs/state_log_'+MODE+'.csv')
 
-			sim().slogf.write('date, select, act, reward, temp[℃],\tpre[mm/min], on time[min], plus->snow[kg/m^2]')
+			sim().slogf.write('date, select, act, reward, temp,\tpre[mm/min], on time[min], road temp, snow[kg/m^2]')
+			sim().slogf.close()
 
 			data1 = all_data[1].split(', ')
 			year   = data1[0]
@@ -486,13 +494,12 @@ if __name__ == '__main__':
 				""" Q learning """
 				# ranks
 				Srank = QL().Qlearn.Srank(snow)
-				if( MODE.find('S') >= 0 ):
-					onSr  = QL().next_Srank(1, cover, temp_o, nightR, \
-											Wspeed, Water, rain_plus, snow,\
-											snow_plus, sfdens, tset, ilp, Qr)
-					offSr = QL().next_Srank(0, cover, temp_o, nightR, \
-											Wspeed, Water, rain_plus, snow,\
-											snow_plus, sfdens, tset, ilp, Qr)
+				onSr, onRr   = QL().next_SRrank(1, cover, temp_o, nightR,\
+										Wspeed, Water, rain_plus, snow,\
+										snow_plus, sfdens, tset, ilp, Qr)
+				offSr, offRr = QL().next_SRrank(0, cover, temp_o, nightR,\
+										Wspeed, Water, rain_plus, snow,\
+										snow_plus, sfdens, tset, ilp, Qr)
 				if( MODE.find('T') >= 0 ):
 					Trank  = QL().Qlearn.Trank(temp_o)
 					nextTr = QL().next_Trank(all_data, shift, data_cnt)
@@ -503,6 +510,8 @@ if __name__ == '__main__':
 					Crank = QL().Qlearn.Crank(onT)
 					onCr  = QL().next_Crank(1, onT, interval)
 					offCr = QL().next_Crank(0, onT, interval)
+				if( MODE.find('R') >= 0 ):
+					Rrank = QL().Qlearn.Rrank(TS)
 
 				# decide action
 				if( MODE == 'S' ):
@@ -515,14 +524,24 @@ if __name__ == '__main__':
 					heater = QL().Qlearn.select_act_TP(Qtable, Srank, Trank, Prank)
 				elif( MODE == 'SP' ):
 					heater = QL().Qlearn.select_act_SP(Qtable, Srank, Prank)
-				elif( MODE == 'C' ):
-					heater = QL().Qlearn.select_act_C(Qtable, Srank, Crank)
 				elif( MODE == 'SC' ):
 					heater = QL().Qlearn.select_act_SC(Qtable, Srank, Crank)
+				elif( MODE == 'SR' ):
+					heater = QL().Qlearn.select_act_SR(Qtable, Srank, Rrank)
+				elif( MODE == 'PR' ):
+					heater = QL().Qlearn.select_act_PR(Qtable, Srank, Prank, Rrank)
 				elif( MODE == 'PC' ):
 					heater = QL().Qlearn.select_act_PC(Qtable, Srank, Prank, Crank)
 				elif( MODE == 'SPC' ):
 					heater = QL().Qlearn.select_act_SPC(Qtable,Srank,Prank,Crank)
+				elif( MODE == 'SPR' ):
+					heater = QL().Qlearn.select_act_SPR(Qtable,Srank,Prank,Rrank)
+				elif( MODE == 'STPR' ):
+					heater = QL().Qlearn.select_act_STPR(Qtable, Srank, Trank,\
+															Prank, Rrank)
+				else:
+					print('inappropriate mode selected')
+					sys.exit()
 
 				# update Q table
 				if( MODE == 'S' ):
@@ -538,28 +557,42 @@ if __name__ == '__main__':
 														nextTr, nextPr)
 				elif( MODE == 'P' ):
 					Qtable, comp = QL().Qlearn.updateQ_P(Qtable, comp, heater,\
-														Srank, Prank, nextPr)
+														onSr, offSr, Prank, nextPr)
 				elif( MODE == 'SP' ):
 					Qtable, comp = QL().Qlearn.updateQ_SP(Qtable, comp, heater,\
 														Srank, Prank, onSr,\
 														offSr, nextPr)
-				elif( MODE == 'C' ):
-					Qtable, comp = QL().Qlearn.updateQ_C(Qtable, comp, heater,\
-													Srank, Crank, onCr, offCr)
 				elif( MODE == 'SC' ):
 					Qtable, comp = QL().Qlearn.updateQ_SC(Qtable, comp, heater,\
 														Srank, Crank, onSr,\
 														offSr, onCr, offCr)
+				elif( MODE == 'SR' ):
+					Qtable, comp = QL().Qlearn.updateQ_SR(Qtable, comp, heater,\
+														Srank, Rrank, onSr,\
+														offSr, onRr, offRr)
+				elif( MODE == 'PR' ):
+					Qtable, comp = QL().Qlearn.updateQ_PR(Qtable, comp, heater,\
+														Prank, Rrank, onSr,offSr,\
+														nextPr, onRr, offRr)
 				elif( MODE == 'PC' ):
 					Qtable, comp = QL().Qlearn.updateQ_PC(Qtable, comp, heater,\
-														Srank, Prank, Crank,\
+														onSr, offSr, Prank, Crank,\
 														nextPr, onCr, offCr)
 				elif( MODE == 'SPC' ):
 					Qtable, comp = QL().Qlearn.updateQ_SPC(Qtable, comp, heater,\
 													Srank, Prank, Crank, onSr,\
 													offSr, nextPr, onCr, offCr)
+				elif( MODE == 'SPR' ):
+					Qtable, comp = QL().Qlearn.updateQ_SPR(Qtable, comp, heater,\
+													Srank, Prank, Rrank, onSr,\
+													offSr, nextPr, onRr, offRr)
+				elif( MODE == 'STPR' ):
+					Qtable, comp = QL().Qlearn.updateQ_STPR(Qtable, comp, heater,\
+													Srank, Trank, Prank, Rrank,\
+													onSr, offSr, nextTr, nextPr,\
+													onRr, offRr)
 
-				Qtable = np.round(Qtable, 3)
+				Qtable = np.round(Qtable, 5)
 
 
 				if(heater==1):	onT += interval
@@ -757,8 +790,9 @@ if __name__ == '__main__':
 				snow  = Snow		# [kg/m^2]
 				sim().slogf.write('{:>5},\t' .format(temp_o))
 				sim().slogf.write('{:1.3f},' .format(pre))
-				str_onT = '{:3.2f}' .format(onT)
+				str_onT = '{:5.2f}' .format(onT)
 				sim().slogf.write('{:>6}, ' .format(str_onT))
+				sim().slogf.write('{:2d}, ' .format(int(TS)))
 				sim().slogf.write('+{:.2f} ' .format(snow_plus))
 				sim().slogf.write('-> {:.3f}' .format(snow))
 				sim().slogf.close()
@@ -774,13 +808,14 @@ if __name__ == '__main__':
 				Tdry_on   = ntime[1][2] * interval
 
 				str_snow = '{:.3f}[kg/m^2]' .format(snow)
-				sys.stderr.write('\r{} {:>6}℃   {:.3f}[mm/min] {:>15}  {}  {:.2f}%'
-						.format(date, temp_o, pre, str_snow, heater, percent))
+				sys.stderr.write('\r{:>4} {}{:>7}℃   {:.3f}[mm/min]{:>16}  {} {:3d}  {:.2f}%'
+					.format(MODE, date, temp_o, pre, str_snow, heater, int(TS), percent))
 
 				date = date + datetime.timedelta(minutes=interval)
 
 #				time.sleep(0.2)
 
+			np.save('Qlogs/result_'+MODE, Qtable)
 			sim().qlogf.write('\n'+str(np.round(Qtable, 3))+'\n')
 			sim().qlogf.close()
 
@@ -790,12 +825,16 @@ if __name__ == '__main__':
 		Qsup        = Qsup * interval/60.0
 		Qr          = Qr * interval/60.0
 
-		Qtable = np.round(Qtable, 3)
+		Qtable = np.round(Qtable, 5)
 		sim().slogf.write('\n{} loops result' .format(qnum+1))
 		sim().slogf.write('\n'+str(Qtable))
 		sim().slogf.close()
 		np.save('Qlogs/result_'+MODE, Qtable)
 
+		sim().qlogf.write('\n'+str(np.round(Qtable, 3))+'\n')
+		sim().qlogf.close()
+
 		time = time.time() - start
-		print("\ntime {:4d}:{:02d}" .format(int(time)//60, int(time)%60))
+		print("\nmode : {}   time {:4d}:{:02d}"
+				.format(MODE, int(time)//60, int(time)%60))
 		print('end time :', datetime.datetime.now())

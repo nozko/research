@@ -13,6 +13,7 @@ import os
 import os.path
 import linecache
 import sys
+import random
 
 import q_control
 
@@ -141,10 +142,10 @@ if __name__ == '__main__':
 	# mode on  : always on
 	# mode off : always off
 	# mode 1   : melt after the snowing stops
-	# mode 2.? : keep the road temperature above 0(2.0) or 10(2.1)
-	# mode 3.? : start warming up the road before snow falls continuously
-	# mode 4.? : switch on/off at a time while snowing and melt all after stops
-	# mode 5.? : turn off earlier
+	# mode 2.x : keep the road temperature above 0(2.0) or 10(2.1)
+	# mode 3.x : start warming up the road before snow falls continuously
+	# mode 4.x : switch on/off at a time while snowing and melt all after stops
+	# mode 5.x : turn off earlier
 	print('interval : {}[min]\tmode : {}' .format(interval, mode))
 
 	if(mode!='p' and mode!='s' and mode!='on' and mode!='off' and mode!='1'
@@ -166,6 +167,7 @@ if __name__ == '__main__':
 	Qsup   = 0		# supplied Q
 	onT    = 0		# operating time
 	offT   = 0
+	nosT   = 0
 	onSum  = 0
 	heater = 0		# on(1) / off(0)
 	noPreT = 0		# no precipitation time
@@ -205,7 +207,7 @@ if __name__ == '__main__':
 	date = year+'-'+str(month)+'-'+day+' '+Hour+':'+str(minute)
 	date = datetime.datetime.strptime(date, '%Y-%m-%d %H:%M')
 
-	TS = 6
+	TS = 5
 
 	oldmin = -1
 
@@ -295,6 +297,8 @@ if __name__ == '__main__':
 					heater = sim().control.on()
 				elif(mode=='off'):
 					heater = sim().control.off()
+#				elif(random.random()<0.05):			# random
+#					heater = random.choice([0, 1])
 				elif(mode=='p'):
 					heater = sim().control.judge_p(pre)
 				elif(mode=='s'):
@@ -364,7 +368,7 @@ if __name__ == '__main__':
 			wat = Water + rain_plus		# [kg/m^2]
 
 
-			TS  = BT			# たぶん路面温度
+			TS  = BT			# たぶん路盤温度
 			# 路面に雪があるとき
 			if( (snow+snow_plus)>0 ):
 				if( TS>0 or sat>0 ):
@@ -449,8 +453,7 @@ if __name__ == '__main__':
 				S2 = C
 
 				for j in range(npn):
-					tmp = T
-					S1 = S1 + HR[j]*(tmp)*interval/60.0
+					S1 = S1 + HR[j]*T*interval/60.0
 					S2 = S2 + HR[j]*interval/60.0
 
 				tmp = (1-BF)*htr*sat
@@ -518,7 +521,7 @@ if __name__ == '__main__':
 			if(SE > 0):		Qsup += SE
 
 			if( pre>0.0 and T>0 ):
-				TS = T			# たぶん路面温度
+				TS = T			# たぶん路盤温度
 				Qr_plus = BF*200*TS + (1-BF)*htr*(TS-sat)
 				Qr = Qr + (Qr_plus)*area
 
@@ -541,18 +544,16 @@ if __name__ == '__main__':
 			Twet_on   = ntime[1][1] * interval
 			Tdry_off  = ntime[0][2] * interval
 			Tdry_on   = ntime[1][2] * interval
-			if(heater==0):
-				sim().logf.write('off\n')
-			else:
-				sim().logf.write('on\n')
+			sim().logf.write('{}\n' .format(heater))
 
 			date = date + datetime.timedelta(minutes=interval)
 
 			if( snow > maxsnow ):	maxsnow = snow
+			if( snow < 0.2 ):		nosT += interval
 
 			str_snow = '{:.3f}[kg/m^2]' .format(snow)
-			sys.stderr.write('\r{}{:>6}℃   {:.3f}[mm/min]  snow:{:>15}  {}'
-							.format(date, temp_o, pre, str_snow, heater))
+			sys.stderr.write('\r{}{:>6}℃   {:.3f}[mm/min]  snow:{:>15}  {}  {}'
+							.format(date, temp_o, pre, str_snow, heater, sat))
 
 #			time.sleep(0.2)
 
@@ -570,8 +571,8 @@ if __name__ == '__main__':
 		Tdry_off  = ntime[0][2] * interval
 		Tdry_on   = ntime[1][2] * interval
 
-		print('\ntotal operating : {} [min],  max snow accumulation : {:.3f}\n'
-				.format(onSum, maxsnow))
-		sim().logf.write('total operating : {} [min],  max snow : {:.3f} [kg/m^2]'
-						.format(onSum, maxsnow))
+		print('\ntotal ope:{} [min],  max snow:{:.3f}, no snow time:{} [min]\n'
+				.format(onSum, maxsnow, nosT))
+		sim().logf.write('total ope:{} [min],  max:{:.3f} [kg/m^2], no snow:{}[min]'
+						.format(onSum, maxsnow, nosT))
 		sim().logf.close()
